@@ -1,13 +1,15 @@
 [project]
 name = "vgi-ccxt-worker"
 version = "0.1.0"
-description = "A VGI worker for DuckDB, generated from the Query.Farm VGI starter template."
+description = "Crypto exchange market data (candles, quotes, order books, trades, perpetual funding) for DuckDB via CCXT"
 readme = "README.md"
-license = "MIT-0"
-license-files = ["LICENSE"]
+license = "MIT"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "Query Farm LLC", email = "hello@query.farm" }]
+keywords = ["duckdb", "vgi", "query-farm", "ccxt", "crypto", "market-data", "ohlcv", "funding-rate"]
 requires-python = ">=3.13"
 dependencies = [
-    "ccxt>=4.5.92",
+    "ccxt>=4.5.92,<5",
     # [http] adds the HTTP transport (`--http`) used by Docker deploys.
     # SDK bumps go through the template (minor bumps can raise the protocol).
     "vgi-python[http]>=0.51.0,<0.52",

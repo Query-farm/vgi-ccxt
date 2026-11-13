@@ -1,0 +1,32 @@
+vgi-ccxt
+Copyright 2026 Query Farm LLC - https://query.farm
+
+This product is licensed under the MIT License. See LICENSE.
+
+------------------------------------------------------------------------------
+
+CCXT
+
+This software depends on CCXT (https://github.com/ccxt/ccxt), the CryptoCurrency
+eXchange Trading Library, which is distributed under the MIT License:
+
+    Copyright (c) 2024 Igor Kroitor
+
+CCXT is installed as a separate package and is not redistributed in this
+repository.
+
+------------------------------------------------------------------------------
+
+Exchange market data
+
+This software reads public market-data endpoints of third-party cryptocurrency
+exchanges. It bundles, caches and redistributes none of that data: every query
+is a live request made from the user's machine, so the user is the API caller.
+The market data it returns belongs to the respective exchanges, is not covered
+by the MIT License above, and is subject to each exchange's terms of use and
+geographic restrictions.
+
+Neither this software nor Query Farm LLC is affiliated with, endorsed by, or
+sponsored by CCXT or any exchange it connects to. Exchange names are trademarks
+of their respective owners and are used here only to describe what this
+software connects to.

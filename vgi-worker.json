@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "catalog": "ccxt",
+  "worker": ["env", "VGI_CCXT_FIXTURES=test/fixtures/exchanges.json", ".venv/bin/vgi-ccxt-worker"],
+  "checks": [
+    {
+      "name": "ohlcv backfill over eight pages (since-cursor)",
+      "sql": "SELECT count(*), count(DISTINCT ts), CAST(min(ts) AS VARCHAR), CAST(max(ts) AS VARCHAR), sum(volume) FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1h', since := TIMESTAMP '2024-01-01', until := TIMESTAMP '2024-01-31')",
+      "rows": [[720, 720, "2024-01-01 00:00:00", "2024-01-30 23:00:00", 10440.0]]
+    },
+    {
+      "name": "ohlcv values",
+      "sql": "SELECT open, high, low, close, volume FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1d', since := DATE '2024-01-01', until := DATE '2024-01-04') ORDER BY ts",
+      "columns": ["open", "high", "low", "close", "volume"],
+      "rows": [[40000.0, 40002.0, 39995.0, 39997.0, 10.0], [40001.0, 40003.0, 39997.0, 39999.0, 11.0], [40002.0, 40004.0, 39999.0, 40001.0, 12.0]]
+    },
+    {
+      "name": "ohlcv terminates when the exchange ignores since",
+      "sql": "SELECT count(*), count(DISTINCT ts) FROM ccxt.main.ohlcv('kraken', 'BTC/USD', '1h', since := TIMESTAMP '2024-02-26')",
+      "rows": [[96, 96]]
+    },
+    {
+      "name": "trades keep fills sharing a millisecond across pages",
+      "sql": "SELECT count(*), count(DISTINCT trade_id), sum(amount) FROM ccxt.main.trades('binance', 'BTC/USDT', since := TIMESTAMP '2024-01-01', until := TIMESTAMP '2024-01-01 02:00:00')",
+      "rows": [[240, 240, 400.0]]
+    },
+    {
+      "name": "trades on an exchange that needs until (windowed)",
+      "sql": "SELECT count(*), count(DISTINCT trade_id) FROM ccxt.main.trades('coinbase', 'BTC/USD', since := TIMESTAMP '2024-01-01', until := TIMESTAMP '2024-01-01 03:00:00')",
+      "rows": [[360, 360]]
+    },
+    {
+      "name": "funding history: interval change and annualization",
+      "sql": "SELECT CAST(ts AS VARCHAR), funding_rate, interval_hours, round(funding_rate_annualized, 6) FROM ccxt.main.funding_rates('binance', 'BTC/USDT:USDT', start_date := TIMESTAMP '2024-01-31 16:00:00', end_date := TIMESTAMP '2024-02-01 09:00:00') ORDER BY ts",
+      "rows": [["2024-01-31 16:00:00", -0.0002, 8.0, -0.219], ["2024-02-01 00:00:00", -0.0001, 8.0, -0.1095], ["2024-02-01 04:00:00", 0.0, 4.0, 0.0], ["2024-02-01 08:00:00", 0.0001, 4.0, 0.219]]
+    },
+    {
+      "name": "ticker fan-out with per-exchange errors",
+      "sql": "SELECT exchange, last, error IS NULL FROM ccxt.main.ticker(['binance', 'coinbase', 'kraken', 'okx'], 'BTC/USDT') ORDER BY exchange",
+      "rows": [["binance", 40000.0, true], ["coinbase", null, false], ["kraken", null, false], ["okx", 40005.0, true]]
+    },
+    {
+      "name": "current funding and open interest",
+      "sql": "SELECT f.exchange, f.funding_rate, f.interval_hours, o.open_interest_amount FROM ccxt.main.funding_rate(['binance', 'okx'], 'BTC/USDT:USDT') f JOIN ccxt.main.open_interest(['binance', 'okx'], 'BTC/USDT:USDT') o USING (exchange) ORDER BY f.exchange",
+      "rows": [["binance", 0.0001, 8.0, 12345.0], ["okx", 0.0001, 8.0, 12345.0]]
+    },
+    {
+      "name": "order book levels",
+      "sql": "SELECT side, level, price, amount FROM ccxt.main.order_book('kraken', 'BTC/USD', depth := 2) ORDER BY side DESC, level",
+      "rows": [["bid", 1, 40999.5, 1.0], ["bid", 2, 40999.0, 2.0], ["ask", 1, 41000.5, 1.0], ["ask", 2, 41001.0, 2.0]]
+    },
+    {
+      "name": "markets stream in several batches",
+      "sql": "SELECT count(*), count(DISTINCT symbol), count(*) FILTER (WHERE contract) FROM ccxt.main.markets('binance')",
+      "rows": [[2503, 2503, 2]]
+    },
+    {
+      "name": "has: capabilities and private methods never exposed",
+      "sql": "SELECT method, supported, exposed_by_worker FROM ccxt.main.has('binance') WHERE method IN ('createOrder', 'fetchBalance', 'fetchFundingRateHistory', 'withdraw') ORDER BY method",
+      "rows": [["createOrder", true, false], ["fetchBalance", true, false], ["fetchFundingRateHistory", true, true], ["withdraw", true, false]]
+    },
+    {
+      "name": "exchanges table",
+      "sql": "SELECT id, has_funding_rate_history FROM ccxt.main.exchanges ORDER BY id",
+      "rows": [["binance", true], ["coinbase", false], ["kraken", false], ["okx", true]]
+    }
+  ]
+}

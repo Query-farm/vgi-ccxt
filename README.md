@@ -1,287 +1,213 @@
-<!-- managed-by: vgi-starters (edit upstream in shared/README.md.tmpl, then run tools/render.py) -->
 <p align="center">
-  <img src="https://query.farm/media-kit/products/vgi/vgi-logo.png" alt="Vector Gateway Interface (VGI)" width="320">
+  <a href="https://query.farm/vgi/">
+    <img src="https://query.farm/media-kit/products/vgi/vgi-logo.png" alt="Vector Gateway Interface (VGI) logo" width="320">
+  </a>
 </p>
 
-<p align="center"><em>A Query.Farm VGI worker for DuckDB, written in Python.</em></p>
+<p align="center"><em>A Query.Farm VGI worker for DuckDB.</em></p>
 
-# VGI Ccxt Worker — Python
+# Query Crypto Exchange Prices, Order Books & Funding Rates in DuckDB
 
-[![CI](https://github.com/your-org/vgi-ccxt/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/vgi-ccxt/actions/workflows/ci.yml)
+> **vgi-ccxt** · a [Query.Farm](https://query.farm) VGI worker · powered by [CCXT](https://github.com/ccxt/ccxt)
+
+[![CI](https://github.com/Query-farm/vgi-ccxt/actions/workflows/ci.yml/badge.svg)](https://github.com/Query-farm/vgi-ccxt/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![vgi worker: query.farm](https://query.farm/media-kit/shields/vgi-worker.svg)](https://query.farm)
 
-[VGI](https://query.farm/vgi) lets DuckDB call functions that live in a separate
-process: your code, in any language, exposed as ordinary SQL. This worker adds
-three example functions that you rename and replace with your own:
+Public market data from more than 100 centralized crypto exchanges as ordinary DuckDB
+table functions: OHLCV candles with windowed backfill, cross-exchange tickers, order-book
+depth, public trades, listed markets and capabilities, and perpetual-swap funding rates
+and open interest. CCXT normalizes Binance, Coinbase, Kraken, OKX, Bybit and the rest into
+one `symbol` / `timeframe` / `since` shape; this worker puts that shape behind SQL.
 
-| Function | Kind | Shows you how to |
-|---|---|---|
-| `greet(name)` / `greet(name, style)` | scalar | vectorize over a column, overload, constrain a constant |
-| `sequence_table(count, step := 1)` | table | stream rows in batches, take named arguments |
-| `fetch_items(base_url, page_size := 100)` | table | page through a REST API, retry, read a secret |
+> **No credentials, public data only.** The worker can only call public market-data
+> endpoints. Read-only is enforced structurally: `src/ccxt_worker/client.py` is the only
+> module that imports `ccxt`, it calls nothing outside a fixed allowlist of public
+> `fetch*` methods, it never sets an API key, and an exchange id from SQL is checked
+> against `ccxt.exchanges` before it is used to look anything up.
+> `tests/test_readonly_guard.py` fails the build if any of that stops being true.
 
+> **Terms of use.** Every query is a live request from your machine to the exchange.
+> Nothing is cached or redistributed by this worker; you are the API caller, and each
+> exchange's terms and geographic restrictions apply to you. Binance.com, for example,
+> answers US IP addresses with HTTP 451, and Bybit with 403. See [NOTICE](NOTICE).
 
 ## Quick start
 
-**Prerequisites:** Python 3.13+ and [uv](https://docs.astral.sh/uv/) (it runs the SQL
-test runner and the metadata checker).
-
-```bash
-make build
-```
-
-Then open DuckDB 2.0 or [Haybarn](https://query.farm/products/haybarn) and attach the
-worker. `LOCATION` is the command DuckDB runs to start it; use an absolute path,
-because a relative one resolves against DuckDB's working directory.
-
-**DuckDB 2.0:**
+Requires Python 3.13+ and [uv](https://docs.astral.sh/uv/). In DuckDB 2.0:
 
 ```sql
 SET allow_extension_repositories = 'allowed';
 CREATE EXTENSION REPOSITORY IF NOT EXISTS query_farm WITH PREFIX 'https://duckdb-extensions.query.farm';
 INSTALL vgi FROM query_farm;
 LOAD vgi FROM query_farm;
+
+ATTACH 'ccxt' AS ccxt (TYPE vgi,
+  LOCATION 'uvx --from git+https://github.com/Query-farm/vgi-ccxt vgi-ccxt-worker');
+```
+
+`uvx` fetches and caches the worker on first use. Once a release is tagged, pin it
+(`…/vgi-ccxt@v0.1.0`) so the worker cannot change under you.
+
+In [Haybarn](https://query.farm/products/haybarn) use `INSTALL vgi FROM community; LOAD vgi;`
+and the same `ATTACH`.
+
+### Other ways to run it
+
+```sql
+-- From a local checkout (make build first); use an absolute path.
 ATTACH 'ccxt' (TYPE vgi, LOCATION '/abs/path/to/vgi-ccxt/.venv/bin/vgi-ccxt-worker');
+
+-- A worker served over HTTP (make run-http, or the Docker image); also LOAD httpfs.
+ATTACH 'ccxt' (TYPE vgi, LOCATION 'http://127.0.0.1:8000');
 ```
 
-**Haybarn 2.0** (`uvx haybarn-cli`):
+## Examples
 
 ```sql
-INSTALL vgi FROM community;
-LOAD vgi;
-ATTACH 'ccxt' (TYPE vgi, LOCATION '/abs/path/to/vgi-ccxt/.venv/bin/vgi-ccxt-worker');
+-- Hourly candles, backfilled through a since-cursor (one exchange page per batch).
+SELECT ts, open, high, low, close, volume
+FROM ccxt.main.ohlcv('coinbase', 'BTC/USD', '1h',
+                     since := TIMESTAMP '2025-01-01', until := TIMESTAMP '2025-01-15')
+ORDER BY ts;
+
+-- One row per exchange; a failing venue reports why in `error`.
+SELECT exchange, last, ask - bid AS spread, quote_volume, error
+FROM ccxt.main.ticker(['kraken', 'coinbase', 'okx'], 'BTC/USDT');
+
+-- Top-of-book depth.
+SELECT side, level, price, amount
+FROM ccxt.main.order_book('kraken', 'BTC/USD', depth := 20)
+ORDER BY side, level;
+
+-- Perpetual funding: decimal per interval (positive = longs pay shorts), plus annualized.
+SELECT ts, funding_rate, interval_hours, funding_rate_annualized
+FROM ccxt.main.funding_rates('okx', 'BTC/USDT:USDT', start_date := current_date - INTERVAL 30 DAY)
+ORDER BY ts;
+
+-- Which exchanges can answer a derivatives question?
+SELECT id, name FROM ccxt.main.exchanges
+WHERE has_funding_rate_history AND has_open_interest ORDER BY id;
 ```
 
-Now call the functions:
+## SQL surface
 
-```sql
-SELECT ccxt.main.greet('Ada');                         -- Hi, Ada!
-SELECT ccxt.main.greet('Ada', 'formal');               -- Good day, Ada.
-SELECT * FROM ccxt.main.sequence_table(5, step := 2) ORDER BY n;
+The leading arguments are positional; the rest are named (`name := value`). Timestamps
+are UTC `TIMESTAMP`s; window bounds also accept a `TIMESTAMPTZ`, a `DATE` or an ISO-8601
+string. A naive timestamp is read as UTC, so for a relative window write
+`since := now() - INTERVAL 1 DAY` (a `TIMESTAMPTZ`), not `now()::TIMESTAMP - …`, which is
+local wall-clock time and would shift the window by your UTC offset.
+
+| Function | Returns |
+|---|---|
+| `ohlcv(exchange, symbol, timeframe, since :=, until :=, max_rows := 100000)` | `exchange, symbol, timeframe, ts, open, high, low, close, volume` |
+| `trades(exchange, symbol, since :=, until :=, max_rows := 100000)` | `exchange, symbol, trade_id, ts, side, price, amount, cost, taker_or_maker` |
+| `funding_rates(exchange, symbol, start_date :=, end_date :=, max_rows := 100000)` | `exchange, symbol, ts, funding_rate, interval_hours, funding_rate_annualized` |
+| `ticker(exchange \| [exchange, …], symbol)` | `exchange, symbol, ts, last, bid, ask, high, low, open, base_volume, quote_volume, change_pct, vwap, error` |
+| `funding_rate(exchange \| [exchange, …], symbol)` | `exchange, symbol, ts, funding_rate, interval_hours, funding_rate_annualized, next_funding_ts, mark_price, index_price, error` |
+| `open_interest(exchange \| [exchange, …], symbol)` | `exchange, symbol, ts, open_interest_amount, open_interest_value, error` |
+| `order_book(exchange, symbol, depth := 20)` | `exchange, symbol, ts, side, level, price, amount` |
+| `markets(exchange)` | `exchange, symbol, market_id, base, quote, settle, type, contract, linear, inverse, contract_size, expiry, active, maker, taker, price_precision, amount_precision, min_amount, min_cost` |
+| `has(exchange \| [exchange, …])` | `exchange, method, supported, status, exposed_by_worker` |
+| table `exchanges` | `id, name, countries, certified, pro, rate_limit_ms, website, has_ohlcv, has_trades, has_funding_rate_history, has_open_interest` |
+
+**Symbols** are CCXT's unified form: `BTC/USD` for spot, `BTC/USDT:USDT` for a
+USDT-settled perpetual, `BTC/USD:BTC` for a coin-margined one. `markets(exchange)` lists
+them.
+
+**Windows** are half-open, `[since, until)`. Without `since` (or `start_date`) a history
+function returns just the exchange's latest page. `until` defaults to now, fixed once when
+the scan starts.
+
+**Fan-out.** `ticker`, `funding_rate` and `open_interest` visit the exchanges one at a time
+and never fail the whole query for one venue: an unsupported capability, an unlisted
+symbol, a geo-block or an outage becomes that row's `error`. Unknown exchange ids are still
+an error at bind.
+
+**Capabilities.** A single-exchange function checks CCXT's `has` map at bind and fails with
+a message naming the missing capability, for example
+`exchange 'kraken' does not support fetchFundingRateHistory`. `has(exchange)` shows the
+whole map, and `exposed_by_worker` marks the methods this worker calls.
+
+### Funding rates
+
+`funding_rate` is the decimal rate for one funding interval as the exchange publishes it
+(`0.0001` = 0.01%), with the convention **positive = longs pay shorts**. CCXT passes each
+exchange's own sign through; Binance, Bybit and OKX document this convention and no
+exchange with the reverse sign is known. `FLIPPED_SIGN_EXCHANGES` in
+`src/ccxt_worker/history.py` is the hook if one turns up.
+
+`interval_hours` is inferred from the spacing between consecutive settlements, because
+venues use 8, 4 or 1 hours and some switch per symbol. A gap that is not a standard
+interval (a missing settlement) keeps the previous interval. A lone settlement takes the
+interval the exchange declares for the current rate. `funding_rate_annualized` is
+`funding_rate × 8760 / interval_hours`, simple rather than compounded.
+
+## Exchange quirks
+
+Measured on 2026-11-12 from a US address with `make live-check` and ad-hoc probes:
+
+- **Kraken** serves only its latest 720 candles per timeframe, so an old `since` returns
+  nothing (1h: the last 30 days). Tickers and books carry no timestamp (`ts` is NULL).
+- **Coinbase** rejects a trades `since` without an `until`. The worker detects that and
+  walks explicit time windows, halving a window that comes back full.
+- Funding-history retention varies: **OKX** returned about three months, **KuCoin
+  Futures** about one, **Kraken Futures** (hourly funding) about a year; **Gate** refuses a
+  start older than 180 days, and **Bitget** ignores `since` and returns its latest page.
+  **Hyperliquid** (hourly funding) returned January 2025 on request. Binance's depth was
+  not measured: it is geo-blocked from the test machine. When an exchange starts later
+  than requested, the worker logs a warning naming the first row it got.
+- **Binance** (HTTP 451) and **Bybit** (HTTP 403 from CloudFront, which CCXT labels
+  `RateLimitExceeded`) refuse US addresses. The worker does not retry a refusal.
+
+## Development
+
+```bash
+make build        # install into .venv
+make check        # everything CI runs: lint, unit tests, SQL tests over stdio/launch/http, vgi-lint
+make live-check   # opt-in smoke test against Kraken, Coinbase and OKX (public GETs)
+make lint-live    # vgi-lint against the real exchanges instead of the fixtures
 ```
-
-`fetch_items` pages through a REST API. Try it against the public demo API (25 fixed items):
-
-```sql
-SELECT category, count(*) AS items, round(avg(price), 2) AS avg_price
-FROM ccxt.main.fetch_items('https://vgi-starter-api.query-farm.services/v1')
-GROUP BY category ORDER BY category;
-```
-
-If an older cached extension misbehaves, refresh it with `FORCE INSTALL vgi FROM query_farm;`
-(DuckDB) or `FORCE INSTALL vgi FROM community;` (Haybarn).
-
-## Using it in a pipeline
-
-Worker functions compose with everything else in DuckDB:
-
-```sql
--- Materialize an API into a local table.
-CREATE TABLE items AS SELECT * FROM ccxt.main.fetch_items('https://vgi-starter-api.query-farm.services/v1');
-
--- Join it with local files.
-SELECT i.name, i.price, s.units
-FROM items i JOIN 'sales.parquet' s ON s.item_id = i.id;
-
--- Call a scalar per row of another table.
-SELECT customer, ccxt.main.greet(customer, 'formal') FROM read_csv('customers.csv');
-```
-
-## Project layout
 
 ```
 src/ccxt_worker/
-  worker.py        # assembles the catalog; add new functions to FUNCTIONS
-  meta.py          # catalog/schema metadata + helpers (object_tags, column)
-  greet.py         # scalar example (overloads, ConstParam choices)
-  sequence.py      # table function example (named args, streaming state)
-  fetch_items.py   # REST API table function (pagination, retries, secrets)
-tests/             # pytest unit tests (in-process client)
-test/sql/          # sqllogictest files run through DuckDB
-test/mock_api/     # offline mock of the REST API used by tests
-examples/          # recipes: pushdown, caching, catalog tables, aggregates, COPY …
-ci/                # integration harness used by `make test-sql` and CI
-scripts/           # vgi_template.py (init / template-diff)
-vgi-agent-tests.yaml  # private graders for the agent test tasks
+  client.py      # the network chokepoint: allowlist, exchange pool, retries
+  fixtures.py    # deterministic offline stand-in exchanges (VGI_CCXT_FIXTURES)
+  history.py     # ohlcv, trades, funding_rates: since-cursor backfills
+  snapshots.py   # ticker, funding_rate, open_interest (fan-out), order_book
+  reference.py   # markets, has, the exchanges table
+  common.py      # argument parsing and funding normalization
+  meta.py        # catalog/schema metadata
+  worker.py      # assembles the catalog
+tests/           # pytest; test_readonly_guard.py, test_live.py (opt-in)
+test/sql/        # sqllogictest, run through Haybarn over every transport
+test/fixtures/   # the fixture exchanges
+vgi-worker.json  # stock-DuckDB verification manifest (fixtures)
 ```
 
-## Adding a function
+**Offline by default.** `VGI_CCXT_FIXTURES=test/fixtures/exchanges.json` swaps every
+exchange for a stand-in whose values are computed from row indexes, so tests assert exact
+numbers. Pages are capped small so every backfill spans several pages, one stand-in
+ignores `since`, one requires `until`, one fails, and one switches funding interval
+mid-series. The unit tests, the SQL tests, the metadata check and `vgi-worker.json` all
+use it; only `make live-check` and `make lint-live` touch the network.
 
-1. Create `src/ccxt_worker/<name>.py`. Copy the closest example: `greet.py` for a
-   scalar, `sequence.py` for a generator, `fetch_items.py` for an API.
-2. Declare arguments with `Annotated[..., Param(...)]`/`ConstParam(...)` (scalars) or a
-   frozen dataclass of `Annotated[..., Arg(...)]` (table functions). Use `Arg(0, ...)`
-   for positional arguments and `Arg("name", default=...)` for named ones.
-3. Give the class a `class Meta` with `name`, `description`, `tags=object_tags(...)`
-   and `examples`.
-4. Add the class to `FUNCTIONS` in `src/ccxt_worker/worker.py`.
-
-**Which kind of function?**
-
-| You want to… | Use |
-|---|---|
-| compute one value per input row | a **scalar** function |
-| return a set of rows from arguments (an API, a file, a generator) | a **table** function |
-| transform or aggregate the rows of a query | a **table in-out** function or an **aggregate** |
-| expose a fixed dataset by name (`SELECT * FROM ccxt.main.t`) | a **catalog table** |
-| write data out to a file or service | `COPY … TO` with a copy function |
-| accept `INSERT` / `UPDATE` / `DELETE` | a catalog table with insert/update/delete functions |
-
-The [examples/](examples/) folder has a recipe for most of these. Writable tables have no
-recipe:
-
-A writable table is a catalog `Table` that names a table in-out function per operation in
-`insert_function`, `update_function` and `delete_function`, with the richest result each one
-produces in `write_result_modes`. The helpers in `vgi.write_results` (`write_options`,
-`write_result_schema`, `write_result_batch`, `row_id_field`) read DuckDB's `write_options`
-argument and build the result. UPDATE and DELETE need a scan function that emits
-`row_id_field()` and declares projection pushdown. Transactions: override `attach_supports_transactions`
-and `catalog_transaction_begin` / `_commit` / `_rollback` on the catalog. See
-[Writable tables](https://github.com/Query-farm/vgi-python/blob/main/docs/catalog-interface.md#writable-tables)
-in the vgi-python docs.
-
-## Secrets and configuration
-
-`fetch_items` shows the recommended pattern. A bearer token comes from a DuckDB secret
-when one exists, and from an environment variable otherwise:
-
-```sql
-CREATE SECRET (TYPE ccxt_api, TOKEN 'your-token');      -- per session, never logged
-```
-
-```bash
-CCXT_API_TOKEN=your-token make run-http                # for servers and containers
-```
-
-Try it: the demo API's `/v1/auth` endpoint needs the published token `demo-token`.
-
-```sql
-SELECT count(*) FROM ccxt.main.fetch_items('https://vgi-starter-api.query-farm.services/v1/auth');   -- fails: HTTP 401
-CREATE SECRET (TYPE ccxt_api, TOKEN 'demo-token');
-SELECT count(*) FROM ccxt.main.fetch_items('https://vgi-starter-api.query-farm.services/v1/auth');   -- 25
-```
-
-Never bake credentials into the image or the source. If a function can't run without
-real credentials, its examples can't execute in CI either. Set `execute: false` on the
-metadata check for that worker (see `.github/workflows/ci.yml`), and add
-`LINT_ARGS ?= --no-execute` to the Makefile so local runs match.
-
-## Testing
-
-```bash
-make test-unit                 # fast Python unit tests
-make test-sql                  # test/sql/*.test through DuckDB (stdio)
-make test-sql TRANSPORT=http   # …over HTTP (also: launch)
-make check                     # everything CI runs
-```
-
-`test/sql/*.test` files are [sqllogictest](https://duckdb.org/docs/stable/dev/sqllogictest/intro)
-scripts. `ci/run-integration.sh` runs them against your worker and fails on any
-unexpected skip, so a broken transport can't hide behind a green run.
-`fetch_items` is tested against `test/mock_api/server.py` so tests are fast and
-offline.
-
-**Testing against real data:** put live tests in their own `.test` file that starts with
-`require-env CCXT_LIVE`. They run only when that variable is set. Add the skip reason
-to `EXPECTED_SKIP_REASONS` in CI.
-
-## Metadata and the quality score
-
-DuckDB, agents and documentation tools discover your functions through their metadata:
-titles, descriptions, argument docs, examples and keywords.
-[vgi-lint](https://github.com/Query-farm/vgi-lint-check) checks it, and CI runs it on
-every push. Its settings live in `vgi-lint.toml`, which `make lint-explain`,
-`vgi-lint lint`, and CI all read. This template scores 100/100 with no findings.
-
-```bash
-make lint-explain                              # findings, each with its fix
-make lint-explain LINT_ARGS="--format agent"   # the same, grouped for coding agents
-make lint-ai                                   # optional: an agent must solve vgi-agent-tests.yaml
-```
-
-Each report also states an **assurance level**: how much was actually verified.
-
-| Level | Reached when | Here |
-|---|---|---|
-| L1 structural | the static metadata is clean | workers that need real credentials (`execute: false` in CI) |
-| L2 behavioural | the examples also run and return what they claim | **the CI gate** |
-| L3 semantic | an agent solves the worker's own test tasks, and the docs are reviewed | `make lint-ai`, before publishing |
-
-- **How strict.** Your copy fails on warnings (`fail_on = "warning"` in `vgi-lint.toml`).
-  Raise it to `"info"` before you publish the worker for others.
-- **The linter isn't pinned.** It tracks the current quality bar, so a new rule can flag
-  metadata that passed yesterday. Fix it, or waive the finding.
-- **Waivers.** If a finding is genuinely wrong for your worker, waive it in
-  `vgi-lint.toml` with a `kind` and a `reason`.
-- **Existing workers.** If you're adding this gate to a worker that already has
-  findings, record them with `vgi-lint lint --baseline vgi-lint-baseline --update-baseline`
-  and set `baseline` in `vgi-lint.toml`. After that, only new findings fail.
-
-Metadata lives in `src/ccxt_worker/meta.py` and each function's `class Meta`.
-
-## Logging and debugging
-
-stdout carries the Arrow protocol, so **never print to stdout**. Log to stderr instead.
-Use the standard `logging` module (the SDK routes it to stderr); `--debug` or `--log-level DEBUG` turns it up.
-
-- Under DuckDB (stdio/launch), worker stderr shows up in DuckDB's error messages and
-  terminal.
-- In Docker it goes to `docker logs`.
-- `make debug` runs one query against the worker with debug logging on.
-
-## Deploying
-
-The same binary serves stdio (DuckDB starts it locally) or HTTP (you host it):
-
-```bash
-docker build -t weather-worker .
-docker run -p 8000:8000 -e CCXT_API_TOKEN=... weather-worker   # health: GET /health
-```
-
-```sql
-ATTACH 'ccxt' (TYPE vgi, LOCATION 'https://workers.example.com/ccxt');
-```
-
-Put hosted workers behind TLS and authentication. See
-[authentication](https://query.farm/vgi/authentication) for bearer tokens and JWTs, and
-[distributing a worker](https://query.farm/vgi/distributing-a-worker) for packaging.
-Pass secrets with `-e` or your platform's secret manager.
-
-## Releasing
-
-Push a tag like `v0.1.0`. The release workflow builds the wheel and sdist, attaches them to the GitHub release, and (if you set the repository variable `PYPI_PUBLISH=true` and configure PyPI Trusted Publishing) publishes to PyPI, so users can run `uvx vgi-ccxt-worker`. Without PyPI, users install straight from the repo with `uvx --from git+https://github.com/your-org/vgi-ccxt@v0.1.0 vgi-ccxt-worker`. Every artifact is signed with cosign and
-carries SLSA build provenance. `ci/check-version.sh` makes sure the tag matches the
-version in `pyproject.toml`.
-
-## Using with coding agents
-
-[AGENTS.md](AGENTS.md) is written for AI coding agents (Claude Code reads it via
-`CLAUDE.md`; Codex, Cursor and others read it directly). It covers the commands, the
-recipe for adding a function, the metadata checklist and the sharp edges. A good first
-prompt:
-
-> Read AGENTS.md. Replace `fetch_items` with `forecast(lat DOUBLE, lon DOUBLE)` that calls
-> the Open-Meteo API. Include full metadata, a mock-server test and a `CCXT_LIVE` test.
-> You're done when `make check` passes.
-
-## Keeping up with the template
-
-`make template-diff` shows what changed upstream (CI, docs, examples) since your copy was
-made. Your copy records its template version in `.vgi-ccxt.json`.
-
-## Learn more
-
-- [What is VGI?](https://query.farm/vgi) · [Getting started](https://query.farm/vgi/getting-started) · [Building a worker](https://query.farm/vgi/building-a-worker)
-- [Python SDK docs](https://query.farm/vgi/docs/python/): [scalar tutorial](https://query.farm/vgi/docs/python/tutorial/scalar/), [table tutorial](https://query.farm/vgi/docs/python/tutorial/table/)
-- [Distributing a worker](https://query.farm/vgi/distributing-a-worker) · [Choosing a language](https://query.farm/vgi/languages) · [llms.txt](https://query.farm/vgi/llms.txt)
-- SDK source: [vgi-python](https://github.com/Query-farm/vgi-python) · RPC layer: [https://vgi-rpc-python.query.farm](https://vgi-rpc-python.query.farm)
+**Rate limits.** Each exchange is created once per worker process with CCXT's
+`enableRateLimit`, and calls to one exchange are serialized, so CCXT's limiter spans
+queries. Rate-limit, timeout and maintenance errors are retried with backoff; refusals
+(HTTP 451/403) and bad requests are not.
 
 ## Support
 
-Open an issue on this repository. For VGI itself, see [query.farm](https://query.farm).
+Open an issue on [this repository](https://github.com/Query-farm/vgi-ccxt/issues). For VGI
+itself, see [query.farm](https://query.farm/vgi/).
 
-## Authorship & license
+## Authorship & License
 
-The starter template is written by [Query.Farm](https://query.farm) and released under
-the [BSD Zero Clause License](LICENSE) (0BSD). Use it for anything, with no attribution
-required. Replace this section with your own license once the code is yours.
+Written by [Query.Farm](https://query.farm). Released under the [MIT License](LICENSE).
+
+Copyright 2026 Query Farm LLC - https://query.farm
+
+The market data this worker returns belongs to the exchanges, is not covered by that
+license, and is subject to each exchange's terms. This project is not affiliated with or
+endorsed by CCXT or any exchange. See [NOTICE](NOTICE).
