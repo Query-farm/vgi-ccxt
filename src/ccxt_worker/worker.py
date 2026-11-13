@@ -1,7 +1,8 @@
 """Assemble the functions into a catalog and run the worker.
 
-To add a function: write it (see ``greet.py`` / ``sequence.py`` /
-``fetch_items.py``), then add the class to ``FUNCTIONS`` below.
+Functions live in ``history.py`` (since-cursor backfills), ``snapshots.py``
+(current state, with cross-exchange fan-out) and ``reference.py`` (exchanges,
+markets, capabilities). Every exchange call goes through ``client.py``.
 
 Run it:
 
@@ -20,10 +21,10 @@ import json
 from typing import Any
 
 from vgi import Worker
-from vgi.catalog import Catalog, Schema
+from vgi.catalog import Catalog, Schema, Table
+from vgi.catalog.constraints import constraint_record
 
-from .fetch_items import API_SECRET_TYPE, FetchItems
-from .greet import Greet, GreetWithStyle
+from .history import FundingRates, Ohlcv, Trades
 from .meta import (
     CATALOG_DOC_MD,
     CATALOG_NAME,
@@ -34,9 +35,20 @@ from .meta import (
     SOURCE_URL,
     keywords_array,
 )
-from .sequence import SequenceTable
+from .reference import Exchanges, Has, Markets
+from .snapshots import FundingRate, OpenInterest, OrderBook, Ticker
 
-FUNCTIONS: list[type[Any]] = [Greet, GreetWithStyle, SequenceTable, FetchItems]
+FUNCTIONS: list[type[Any]] = [
+    Ohlcv,
+    Trades,
+    Ticker,
+    OrderBook,
+    Markets,
+    Has,
+    FundingRates,
+    FundingRate,
+    OpenInterest,
+]
 
 
 def _stamp_example_queries(functions: list[type[Any]]) -> list[dict[str, str]]:
@@ -57,7 +69,20 @@ def _stamp_example_queries(functions: list[type[Any]]) -> list[dict[str, str]]:
     return [entry for entries in by_name.values() for entry in entries]
 
 
-_ALL_EXAMPLES = _stamp_example_queries(FUNCTIONS)
+_ALL_EXAMPLES = _stamp_example_queries([*FUNCTIONS, Exchanges])
+
+
+def _schema_examples() -> list[dict[str, str]]:
+    """One example per object for the schema-level list, which agent tools cap at 4,000 characters."""
+    seen: set[str] = set()
+    picked: list[dict[str, str]] = []
+    objects: list[type[Any]] = [*FUNCTIONS, Exchanges]
+    for fn in objects:
+        if fn.Meta.name not in seen and fn.Meta.examples:
+            seen.add(fn.Meta.name)
+            ex = fn.Meta.examples[0]
+            picked.append({"description": ex.description, "sql": ex.sql})
+    return picked
 
 
 class CcxtWorker(Worker):
@@ -73,20 +98,51 @@ class CcxtWorker(Worker):
                 path=["main"],
                 comment=SCHEMA_DOC_MD,
                 functions=FUNCTIONS,
+                tables=[
+                    Table(
+                        name="exchanges",
+                        function=Exchanges,
+                        comment=Exchanges.Meta.description,
+                        tags={**Exchanges.Meta.tags, "domain": "finance"},
+                        column_comments={
+                            f.name: (f.metadata or {})[b"comment"].decode() for f in Exchanges.FIXED_SCHEMA
+                        },
+                        constraints=(
+                            constraint_record(
+                                ["main"],
+                                "exchanges",
+                                "pk",
+                                "PRIMARY_KEY",
+                                [["id"]],
+                                enforcement="ENFORCED",
+                                validation="ALL_ROWS",
+                            ),
+                            constraint_record(
+                                ["main"],
+                                "exchanges",
+                                "id_not_null",
+                                "NOT_NULL",
+                                [["id"]],
+                                enforcement="ENFORCED",
+                                validation="ALL_ROWS",
+                            ),
+                        ),
+                    )
+                ],
                 tags={
-                    "vgi.title": "Ccxt Functions",
-                    "domain": "examples",
-                    "vgi.keywords": keywords_array("greeting, sequence, generator, rest api, pagination"),
+                    "vgi.title": "Crypto Market Data Functions",
+                    "domain": "finance",
+                    "vgi.keywords": keywords_array(
+                        "crypto, ohlcv, ticker, order book, trades, funding rate, open interest, markets"
+                    ),
                     "vgi.doc_llm": SCHEMA_DOC_LLM,
                     "vgi.doc_md": SCHEMA_DOC_MD,
                     "vgi.categories": json.dumps(SCHEMA_CATEGORIES),
-                    "vgi.example_queries": json.dumps(_ALL_EXAMPLES),
+                    "vgi.example_queries": json.dumps(_schema_examples()),
                 },
             )
         ],
     )
-
-    secret_types = [API_SECRET_TYPE]
 
 
 def main() -> None:

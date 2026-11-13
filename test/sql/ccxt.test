@@ -1,148 +1,259 @@
 # name: test/sql/ccxt.test
-# description: SQL-level tests for the ccxt worker, run through DuckDB by ci/run-integration.sh
+# description: SQL-level tests for the ccxt worker, run through DuckDB by ci/run-integration.sh.
+#              Every exchange is the offline fixture stand-in (test/fixtures/exchanges.json),
+#              whose clock is fixed at 2024-03-01 00:00 UTC.
 # group: [ccxt]
-# managed-by: vgi-starters (edit upstream in shared/, then run tools/render.py)
 
 require vgi
 
 require-env CCXT_WORKER
 
-require-env CCXT_MOCK_API
-
-require-env CCXT_MOCK_API_AUTH
+require-env VGI_CCXT_FIXTURES
 
 statement ok
 ATTACH 'ccxt' (TYPE vgi, LOCATION '{CCXT_WORKER}');
 
-# ---------------------------------------------------------------- greet (scalar)
+# ------------------------------------------------------------------- ohlcv
 
-query T
-SELECT ccxt.main.greet('Ada');
+# 30 days of hourly candles = 720 rows over 8 exchange pages of 100. Over HTTP each
+# page is a separate request, so this only passes if the since-cursor travels with it.
+query IIIII
+SELECT count(*), count(DISTINCT ts), min(ts), max(ts), sum(volume)
+FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1h',
+                     since := TIMESTAMP '2024-01-01', until := TIMESTAMP '2024-01-31');
 ----
-Hi, Ada!
+720	720	2024-01-01 00:00:00	2024-01-30 23:00:00	10440.0
 
-query T
-SELECT ccxt.main.greet('Ada', 'formal');
-----
-Good day, Ada.
-
-# NULL in, NULL out.
-query T
-SELECT ccxt.main.greet(NULL);
-----
-NULL
-
-# Works over a whole column, one result per row.
-query T
-SELECT ccxt.main.greet(name) FROM (VALUES ('Ada'), ('Grace'), (NULL)) AS t(name) ORDER BY ALL NULLS LAST;
-----
-Hi, Ada!
-Hi, Grace!
-NULL
-
-# `style` is constrained to 'casual' | 'formal' and checked when the query is bound.
-# (No expected message: each SDK words constraint errors its own way.)
-statement error
-SELECT ccxt.main.greet('Ada', 'loud');
-----
-<REGEX>:.*
-
-# ------------------------------------------------------ sequence_table (table fn)
-
-query II
-SELECT n, squared FROM ccxt.main.sequence_table(4) ORDER BY n;
-----
-0	0
-1	1
-2	4
-3	9
-
-# Named argument with a default.
+# No gaps: every consecutive pair is exactly one hour apart.
 query I
-SELECT n FROM ccxt.main.sequence_table(3, step := 5) ORDER BY n;
-----
-0
-5
-10
-
-# Larger than one batch: the cursor must carry across process calls.
-query II
-SELECT count(*), max(n) FROM ccxt.main.sequence_table(25000);
-----
-25000	24999
-
-query I
-SELECT count(*) FROM ccxt.main.sequence_table(0);
+SELECT count(*) FROM (
+  SELECT ts - lag(ts) OVER (ORDER BY ts) AS gap
+  FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1h', since := TIMESTAMP '2024-01-01', until := TIMESTAMP '2024-01-31')
+) WHERE gap IS NOT NULL AND gap <> INTERVAL 1 HOUR;
 ----
 0
 
-# count is constrained to [0, 1000000].
-statement error
-SELECT * FROM ccxt.main.sequence_table(-1);
+query RRRRR
+SELECT open, high, low, close, volume
+FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1d', since := DATE '2024-01-01', until := DATE '2024-01-04')
+ORDER BY ts;
 ----
-<REGEX>:.*
+40000.0	40002.0	39995.0	39997.0	10.0
+40001.0	40003.0	39997.0	39999.0	11.0
+40002.0	40003.0	39999.0	40001.0	12.0
 
-# Named arguments are constrained too: step >= 1.
-statement error
-SELECT * FROM ccxt.main.sequence_table(3, step := 0);
+# The window runs past the data: the backfill stops on the first empty page.
+query II
+SELECT count(*), max(ts) FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1d', since := '2024-02-20T00:00:00Z');
 ----
-<REGEX>:.*
+10	2024-02-29 00:00:00
 
-# ------------------------------------------------- fetch_items (REST table fn)
-
-query IIT
-SELECT count(*), sum(id), min(name) FROM ccxt.main.fetch_items('{CCXT_MOCK_API}', page_size := 4);
+# A window with no data at all is empty, not an error.
+query I
+SELECT count(*) FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1d',
+                                     since := TIMESTAMP '2025-01-01', until := TIMESTAMP '2025-02-01');
 ----
-25	325	item-01
+0
 
-query TI
-SELECT category, count(*) FROM ccxt.main.fetch_items('{CCXT_MOCK_API}') GROUP BY category ORDER BY category;
+# The kraken fixture ignores `since` (always its oldest candles): the cursor still terminates.
+query II
+SELECT count(*), count(DISTINCT ts) FROM ccxt.main.ohlcv('kraken', 'BTC/USD', '1h', since := TIMESTAMP '2024-02-26');
 ----
-hardware	8
-service	8
-software	9
+96	96
 
-# The harness runs CCXT_MOCK_API with MOCK_API_FLAKY=1: every page answers
-# 429 + Retry-After once, so every query above also exercised the retry path.
-
-# CCXT_MOCK_API_AUTH requires a bearer token ('test-token'). Every language's
-# fetch_items must put the HTTP status code in its error message.
-statement error
-SELECT count(*) FROM ccxt.main.fetch_items('{CCXT_MOCK_API_AUTH}');
+# Without since: only the latest page.
+query II
+SELECT count(*), max(ts) FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1h');
 ----
-401
-
-statement ok
-CREATE SECRET ccxt_api_test (TYPE ccxt_api, TOKEN 'test-token');
+100	2024-02-29 23:00:00
 
 query I
-SELECT count(*) FROM ccxt.main.fetch_items('{CCXT_MOCK_API_AUTH}', page_size := 25);
+SELECT count(*) FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1m', since := TIMESTAMP '2024-01-01', max_rows := 250);
 ----
-25
+250
 
-# Several pages: the token must survive between batches (over HTTP each batch is a
-# separate request, so a token kept only in memory is lost after page 1).
+statement error
+SELECT * FROM ccxt.main.ohlcv('kraken', 'BTC/USD', '5m');
+----
+does not offer timeframe '5m'
+
+statement error
+SELECT * FROM ccxt.main.ohlcv('notanexchange', 'BTC/USD', '1h');
+----
+unknown exchange 'notanexchange'
+
+statement error
+SELECT * FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1h', since := TIMESTAMP '2024-02-01', until := TIMESTAMP '2024-01-01');
+----
+since must be earlier than until
+
+statement error
+SELECT * FROM ccxt.main.ohlcv('binance', 'DOGE/EUR', '1h', since := TIMESTAMP '2024-01-01');
+----
+BadSymbol
+
+statement error
+SELECT * FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1h', max_rows := 0);
+----
+<REGEX>:.*
+
+# ------------------------------------------------------------------- trades
+
+# Pages hold 40 fills and each minute holds 1-3 fills sharing a timestamp, so pages end
+# mid-millisecond; nothing may be dropped or repeated. 2 hours = 40 x (1+2+3) = 240 fills.
+query III
+SELECT count(*), count(DISTINCT trade_id), sum(amount)
+FROM ccxt.main.trades('binance', 'BTC/USDT', since := TIMESTAMP '2024-01-01', until := TIMESTAMP '2024-01-01 02:00:00');
+----
+240	240	400.0
+
 query I
-SELECT count(*) FROM ccxt.main.fetch_items('{CCXT_MOCK_API_AUTH}', page_size := 7);
+SELECT count(*) FROM ccxt.main.trades('binance', 'BTC/USDT', since := TIMESTAMP '2024-01-01', max_rows := 55);
 ----
-25
+55
 
-statement ok
-DROP SECRET ccxt_api_test;
+# ------------------------------------------------------------------- funding_rates
 
-# base_url must be http(s).
+# 8h settlements in January (31 days x 3), streamed over several pages of 30.
+query II
+SELECT count(*), sum(CASE WHEN interval_hours = 8 THEN 1 ELSE 0 END)
+FROM ccxt.main.funding_rates('binance', 'BTC/USDT:USDT', start_date := DATE '2024-01-01', end_date := DATE '2024-02-01');
+----
+93	93
+
+# The fixture moves to 4h settlements after 2024-02-01 00:00; sign passes through
+# (positive = longs pay), and annualized = rate x 8760 / interval_hours.
+query TRRR
+SELECT ts::VARCHAR, funding_rate, interval_hours, round(funding_rate_annualized, 6)
+FROM ccxt.main.funding_rates('binance', 'BTC/USDT:USDT',
+                             start_date := TIMESTAMP '2024-01-31 16:00:00', end_date := TIMESTAMP '2024-02-01 09:00:00')
+ORDER BY ts;
+----
+2024-01-31 16:00:00	-0.0002	8.0	-0.219
+2024-02-01 00:00:00	-0.0001	8.0	-0.1095
+2024-02-01 04:00:00	0.0	4.0	0.0
+2024-02-01 08:00:00	0.0001	4.0	0.219
+
 statement error
-SELECT * FROM ccxt.main.fetch_items('ftp://example.com');
+SELECT * FROM ccxt.main.funding_rates('kraken', 'BTC/USD');
+----
+does not support fetchFundingRateHistory
+
+# ------------------------------------------------------------------- ticker (fan-out)
+
+query TRRR
+SELECT exchange, bid, last, ask FROM ccxt.main.ticker('binance', 'BTC/USDT');
+----
+binance	39999.5	40000.0	40000.5
+
+# One row per exchange; a failing venue reports why in `error` instead of failing the query.
+query TTT
+SELECT exchange, last IS NULL, error IS NULL
+FROM ccxt.main.ticker(['binance', 'coinbase', 'kraken', 'okx'], 'BTC/USDT') ORDER BY exchange;
+----
+binance	false	true
+coinbase	true	false
+kraken	true	false
+okx	false	true
+
+query T
+SELECT regexp_extract(error, '(ExchangeNotAvailable|BadSymbol)')
+FROM ccxt.main.ticker(['coinbase', 'kraken'], 'BTC/USDT') ORDER BY exchange;
+----
+ExchangeNotAvailable
+BadSymbol
+
+statement error
+SELECT * FROM ccxt.main.ticker(['binance', 'mtgox'], 'BTC/USDT');
+----
+unknown exchange 'mtgox'
+
+# ------------------------------------------------------------------- funding_rate / open_interest
+
+query TRRRT
+SELECT exchange, funding_rate, interval_hours, round(funding_rate_annualized, 6), error IS NULL
+FROM ccxt.main.funding_rate(['binance', 'okx', 'kraken'], 'BTC/USDT:USDT') ORDER BY exchange;
+----
+binance	0.0001	8.0	0.1095	true
+kraken	NULL	NULL	NULL	false
+okx	0.0001	8.0	0.1095	true
+
+query TRR
+SELECT exchange, open_interest_amount, open_interest_value
+FROM ccxt.main.open_interest(['binance', 'okx'], 'BTC/USDT:USDT') ORDER BY exchange;
+----
+binance	12345.0	493923450.0
+okx	12345.0	494046900.0
+
+# ------------------------------------------------------------------- order_book
+
+query TIRR
+SELECT side, level, price, amount FROM ccxt.main.order_book('kraken', 'BTC/USD', depth := 2) ORDER BY side DESC, level;
+----
+bid	1	40999.5	1.0
+bid	2	40999.0	2.0
+ask	1	41000.5	1.0
+ask	2	41001.0	2.0
+
+query II
+SELECT count(*), count(DISTINCT side) FROM ccxt.main.order_book('kraken', 'BTC/USD');
+----
+40	2
+
+statement error
+SELECT * FROM ccxt.main.order_book('kraken', 'BTC/USD', depth := 0);
 ----
 <REGEX>:.*
 
-# page_size is a named argument constrained to [1, 1000].
-statement error
-SELECT * FROM ccxt.main.fetch_items('{CCXT_MOCK_API}', page_size := 0);
-----
-<REGEX>:.*
+# ------------------------------------------------------------------- markets
 
-statement error
-SELECT * FROM ccxt.main.fetch_items('{CCXT_MOCK_API}', page_size := 5000);
+# 2,503 markets stream as three batches of up to 1,000.
+query II
+SELECT count(*), count(DISTINCT symbol) FROM ccxt.main.markets('binance');
 ----
-<REGEX>:.*
+2503	2503
+
+query TTTTR
+SELECT symbol, type, settle, linear, contract_size FROM ccxt.main.markets('binance') WHERE contract ORDER BY symbol;
+----
+BTC/USDT:USDT	swap	USDT	true	1.0
+ETH/USDT:USDT	swap	USDT	true	1.0
+
+# ------------------------------------------------------------------- has / exchanges
+
+query TTT
+SELECT method, supported, status FROM ccxt.main.has('kraken')
+WHERE method IN ('fetchOHLCV', 'fetchFundingRateHistory', 'fetchOpenInterest') ORDER BY method;
+----
+fetchFundingRateHistory	false	unsupported
+fetchOHLCV	true	native
+fetchOpenInterest	false	unknown
+
+# CCXT advertises private methods; the worker never exposes them.
+query TT
+SELECT method, exposed_by_worker FROM ccxt.main.has('binance')
+WHERE method IN ('createOrder', 'fetchBalance', 'fetchFundingHistory', 'fetchMyTrades', 'fetchTicker', 'withdraw')
+ORDER BY method;
+----
+createOrder	false
+fetchBalance	false
+fetchFundingHistory	false
+fetchMyTrades	false
+fetchTicker	true
+withdraw	false
+
+query TT
+SELECT exchange, supported FROM ccxt.main.has(['binance', 'kraken', 'okx'])
+WHERE method = 'fetchFundingRateHistory' ORDER BY exchange;
+----
+binance	true
+kraken	false
+okx	true
+
+query TTT
+SELECT id, name, has_funding_rate_history FROM ccxt.main.exchanges ORDER BY id;
+----
+binance	Binance	true
+coinbase	Coinbase Advanced	false
+kraken	Kraken	false
+okx	OKX	true

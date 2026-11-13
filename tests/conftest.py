@@ -1,16 +1,26 @@
-"""Shared fixtures: a worker client and the local mock API."""
+"""Shared fixtures: every test runs against the offline fixture exchanges, never the network."""
 
 from __future__ import annotations
 
-import subprocess
+import os
 import sys
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
+import pyarrow as pa
 import pytest
+from vgi.arguments import Arguments
 from vgi.client import Client
 
 ROOT = Path(__file__).resolve().parent.parent
+FIXTURES = ROOT / "test" / "fixtures" / "exchanges.json"
+
+# Set before the worker package is imported or launched: the chokepoint reads it per call,
+# and the client's subprocess inherits it.
+os.environ["VGI_CCXT_FIXTURES"] = str(FIXTURES)
+
+SCHEMA = ["main"]
 
 
 @pytest.fixture(scope="session")
@@ -20,17 +30,21 @@ def client() -> Iterator[Client]:
         yield c
 
 
-@pytest.fixture(scope="session")
-def mock_api() -> Iterator[str]:
-    """Start test/mock_api/server.py on a free port and return its base URL."""
-    proc = subprocess.Popen(
-        [sys.executable, str(ROOT / "test" / "mock_api" / "server.py")],
-        stdout=subprocess.PIPE,
-        text=True,
+def scan(client: Client, name: str, *positional: Any, **named: Any) -> pa.Table:
+    """Run table function ``name`` and collect every batch."""
+    arguments = Arguments(
+        positional=tuple(v if isinstance(v, pa.Scalar) else pa.scalar(v) for v in positional),
+        named={k: v if isinstance(v, pa.Scalar) else pa.scalar(v) for k, v in named.items()},
     )
-    assert proc.stdout is not None
-    line = proc.stdout.readline().strip()
-    assert line.startswith("PORT:"), line
-    yield f"http://127.0.0.1:{line.removeprefix('PORT:')}"
-    proc.terminate()
-    proc.wait(timeout=10)
+    batches = list(client.table_function(function_name=name, schema_path=SCHEMA, arguments=arguments))
+    return pa.Table.from_batches(batches) if batches else pa.table({})
+
+
+def batch_count(client: Client, name: str, *positional: Any, **named: Any) -> int:
+    """How many non-empty batches ``name`` streamed."""
+    arguments = Arguments(
+        positional=tuple(pa.scalar(v) for v in positional),
+        named={k: pa.scalar(v) for k, v in named.items()},
+    )
+    batches = client.table_function(function_name=name, schema_path=SCHEMA, arguments=arguments)
+    return sum(1 for b in batches if b.num_rows)

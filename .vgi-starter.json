@@ -4,7 +4,7 @@
   "template_version": "1.2.0",
   "post_init": [
     "uv lock",
-    "uv run --quiet ruff format src tests test examples"
+    "uv run --quiet ruff format src tests test"
   ],
   "template_only_files": [
     ".github/workflows/template-init.yml"

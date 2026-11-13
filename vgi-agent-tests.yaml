@@ -1,16 +1,46 @@
 # Private graders for the public vgi.agent_test_tasks in the worker's catalog metadata.
 # `vgi-lint lint --ai` runs an agent on each prompt and grades it with check_sql.
 # See https://github.com/Query-farm/vgi-lint-check (VGI920).
+#
+# Every grader is a check_sql, never a reference_sql: the data is live, so an exact
+# result-set comparison cannot pass reliably. The capability tasks read CCXT's built-in
+# metadata (no network); the price tasks query public exchange endpoints.
 tasks:
-  - name: formal_greeting
-    reference_sql: SELECT ccxt.main.greet('Grace', 'formal') AS greeting
-  - name: sum_of_squares
-    reference_sql: SELECT sum(squared) AS total FROM ccxt.main.sequence_table(10)
-  - name: stepped_sequence
-    reference_sql: SELECT n FROM ccxt.main.sequence_table(4, step := 5) ORDER BY n
-  # Reads the public demo API (https://vgi-starter-api.query-farm.services/v1).
-  - name: items_per_category
+  - name: kraken_supports_ohlcv
     check_sql: >-
-      SELECT count(*) = 3 AND sum(items) = 25
-      FROM (SELECT category, count(*) AS items
-            FROM ccxt.main.fetch_items('https://vgi-starter-api.query-farm.services/v1') GROUP BY category)
+      SELECT bool_and(supported) FROM ccxt.main.has('kraken') WHERE method = 'fetchOHLCV'
+  - name: exchanges_with_funding_history
+    check_sql: >-
+      SELECT count(*) > 10 FROM ccxt.main.exchanges WHERE has_funding_rate_history
+  - name: btc_daily_closes
+    check_sql: >-
+      SELECT count(*) = 7 AND min(close) > 1000
+      FROM ccxt.main.ohlcv('coinbase', 'BTC/USD', '1d',
+                           since := TIMESTAMP '2025-01-01', until := TIMESTAMP '2025-01-08')
+  - name: okx_funding_january
+    check_sql: >-
+      SELECT count(*) >= 90 AND abs(avg(funding_rate_annualized)) < 5
+      FROM ccxt.main.funding_rates('okx', 'BTC/USDT:USDT',
+                                   start_date := DATE '2025-01-01', end_date := DATE '2025-02-01')
+  - name: btc_spread_kraken_coinbase
+    check_sql: >-
+      SELECT count(*) = 2 AND bool_and(ask >= bid)
+      FROM ccxt.main.ticker(['kraken', 'coinbase'], 'BTC/USD') WHERE error IS NULL
+  - name: kraken_recent_trade_count
+    check_sql: >-
+      SELECT count(*) > 0 FROM ccxt.main.trades('kraken', 'BTC/USD')
+  - name: kraken_book_liquidity
+    check_sql: >-
+      SELECT sum(amount) > 0 FROM ccxt.main.order_book('kraken', 'BTC/USD', depth := 10) WHERE side = 'bid'
+  - name: okx_btc_perpetuals
+    check_sql: >-
+      SELECT count(*) > 0 FROM ccxt.main.markets('okx')
+      WHERE type = 'swap' AND base = 'BTC' AND symbol = 'BTC/USDT:USDT'
+  - name: okx_current_funding
+    check_sql: >-
+      SELECT count(*) = 1 FROM ccxt.main.funding_rate('okx', 'BTC/USDT:USDT')
+      WHERE error IS NULL AND funding_rate_annualized IS NOT NULL
+  - name: okx_open_interest
+    check_sql: >-
+      SELECT count(*) = 1 FROM ccxt.main.open_interest('okx', 'BTC/USDT:USDT')
+      WHERE error IS NULL AND coalesce(open_interest_amount, open_interest_value) > 0

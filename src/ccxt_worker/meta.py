@@ -1,12 +1,8 @@
-"""Discovery metadata: the one file to edit when you rename or extend the worker.
+"""Discovery metadata for the catalog, the schema and every function.
 
-DuckDB, coding agents and the ``vgi-lint`` metadata checker all read these
-tags. Keep every object documented and ``make lint`` stays at 100.
-
-* Catalog-level tags (title, license, author, links, long description) live in
-  ``CATALOG_TAGS`` below.
-* Every function and table carries ``object_tags(...)``: a title, a category
-  from ``SCHEMA_CATEGORIES``, search keywords, and LLM- and human-facing docs.
+DuckDB, coding agents and the ``vgi-lint`` metadata checker all read these tags.
+Every object carries ``object_tags(...)``: a title, a category from
+``SCHEMA_CATEGORIES``, search keywords, and LLM- and human-facing docs.
 """
 
 from __future__ import annotations
@@ -18,14 +14,37 @@ import pyarrow as pa
 
 CATALOG_NAME = "ccxt"
 
-SOURCE_URL = "https://github.com/your-org/vgi-ccxt"
+SOURCE_URL = "https://github.com/Query-farm/vgi-ccxt"
 
-# Categories group functions in docs and agent tools. Every object's
-# ``vgi.category`` must name one of these.
+#: Appended to every function's human docs: the data is the exchanges', not ours.
+TERMS_NOTE = (
+    "Every call is a live request from your machine to the exchange's public API. Nothing is "
+    "cached or redistributed by this worker; you are the API caller, and each exchange's terms "
+    "of use and geographic restrictions apply to you (for example, Binance.com refuses US IP "
+    "addresses)."
+)
+
 SCHEMA_CATEGORIES = [
-    {"name": "text", "title": "Text", "description": "Functions that build or transform strings."},
-    {"name": "generators", "title": "Generators", "description": "Table functions that generate rows."},
-    {"name": "api", "title": "REST APIs", "description": "Table functions that read from HTTP APIs."},
+    {
+        "name": "history",
+        "title": "Historical Market Data",
+        "description": "Windowed backfills of candles and public trades, paged with a since-cursor.",
+    },
+    {
+        "name": "snapshots",
+        "title": "Live Snapshots",
+        "description": "Point-in-time quotes and order-book depth, optionally across several exchanges.",
+    },
+    {
+        "name": "derivatives",
+        "title": "Perpetuals & Derivatives",
+        "description": "Funding rates and open interest for perpetual swaps and futures.",
+    },
+    {
+        "name": "reference",
+        "title": "Reference Data",
+        "description": "Exchanges, their listed markets and the CCXT capabilities each one supports.",
+    },
 ]
 
 
@@ -52,84 +71,133 @@ def column(name: str, type_: pa.DataType, comment: str, *, nullable: bool = True
     return pa.field(name, type_, nullable=nullable, metadata={b"comment": comment.encode()})
 
 
+_DUCKDB_TYPES = {
+    pa.string(): "VARCHAR",
+    pa.float64(): "DOUBLE",
+    pa.int64(): "BIGINT",
+    pa.bool_(): "BOOLEAN",
+    pa.timestamp("us"): "TIMESTAMP",
+    pa.list_(pa.string()): "VARCHAR[]",
+}
+
+
+def result_columns(schema: pa.Schema) -> str:
+    """Build the ``vgi.result_columns_schema`` tag for a schema from its field comments."""
+    return json.dumps(
+        [
+            {
+                "name": f.name,
+                "type": _DUCKDB_TYPES[f.type],
+                "description": (f.metadata or {}).get(b"comment", b"").decode(),
+            }
+            for f in schema
+        ]
+    )
+
+
 CATALOG_DOC_LLM = (
-    "An example VGI worker generated from the Query.Farm starter template. It shows the three "
-    "shapes most workers need: a vectorized scalar function (`greet`, with a one- and two-argument "
-    "overload), a deterministic table function with a named default argument (`sequence_table`), "
-    "and a table function that pages through a REST API with retries and an optional bearer token "
-    "taken from a DuckDB secret or an environment variable (`fetch_items`). Replace these with "
-    "your own functions; keep the metadata complete so agents can discover and call them."
+    "Public cryptocurrency market data from more than one hundred centralized exchanges, through "
+    "the CCXT library's unified API. Exchanges are named by their CCXT id (for example 'kraken', "
+    "'coinbase', 'okx', 'binance', 'bybit') and markets by CCXT's unified symbol: 'BASE/QUOTE' for "
+    "spot (such as 'BTC/USD') and 'BASE/QUOTE:SETTLE' for perpetual swaps (such as "
+    "'BTC/USDT:USDT'). Use it for candle backfills, cross-exchange price comparison, order-book "
+    "depth, recent trades, and perpetual funding and open interest. No API key is needed: only "
+    "public endpoints are reachable, and every query is a live request to the exchange. Timestamps "
+    "are UTC. Exchanges differ in what they support, so check capabilities before relying on one."
 )
 
 CATALOG_DOC_MD = (
-    "# VGI ccxt worker\n\n"
-    "**An example [VGI](https://query.farm/vgi) worker that brings custom functions into DuckDB "
-    "SQL.** It was generated from the Query.Farm starter template and is meant to be renamed and "
-    "rewritten: every function here demonstrates one pattern you will reuse.\n\n"
-    "- `greet(name)` and `greet(name, style)`: a vectorized scalar with an overload and a "
-    "constrained constant argument.\n"
-    "- `sequence_table(count, step := 1)`: a deterministic table function that streams its "
-    "output in batches.\n"
-    "- `fetch_items(base_url, page_size := 100)`: wraps a paginated REST API, retrying politely "
-    "and reading a bearer token from a DuckDB secret or the environment.\n\n"
-    "The worker speaks Apache Arrow to DuckDB over stdin/stdout, a Unix socket, or HTTP, so the "
-    "same code runs as a local subprocess or a hosted service. See the "
-    "[VGI documentation](https://query.farm/vgi/docs/) to learn more."
+    "# Crypto exchange market data\n\n"
+    "Unified public market data from more than one hundred centralized crypto exchanges, served "
+    "to DuckDB through the MIT-licensed [CCXT](https://github.com/ccxt/ccxt) library: candles, "
+    "quotes, order books, trades, listed markets, and perpetual-swap funding and open interest.\n\n"
+    "Exchanges are named by CCXT id and markets by CCXT's unified symbol (`BTC/USD` for spot, "
+    "`BTC/USDT:USDT` for a USDT-settled perpetual). No credentials are used or accepted.\n\n"
+    "**Terms of use.** " + TERMS_NOTE
 )
 
 SCHEMA_DOC_LLM = (
-    "The `main` schema holds the starter template's example functions, one per common worker "
-    "pattern. `greet(name)` and `greet(name, style)` are vectorized scalars: use them inside a "
-    "projection or predicate, one result per row; `style` is a constant that must be 'casual' or "
-    "'formal'. `sequence_table(count, step := 1)` is a deterministic table function that returns "
-    "`count` rows of `(n, squared)`; use it for demos, tests, and as a template for generators. "
-    "`fetch_items(base_url, page_size := 100)` reads every item from a paginated JSON REST API as "
-    "`(id, name, category, price)` rows, streaming one page per batch, retrying rate-limited "
-    "requests, and authenticating with a `ccxt_api` DuckDB secret or the `CCXT_API_TOKEN` "
-    "environment variable. Scalars cannot take named arguments; table functions can."
+    "Table functions over CCXT's public market-data API. History functions page through a time "
+    "window with a since-cursor and accept `TIMESTAMP`, `DATE` or ISO-8601 string bounds; snapshot functions "
+    "return the current state and some accept a list of exchanges to compare them side by side, "
+    "reporting a per-exchange failure in an error column instead of failing the query. Reference "
+    "functions describe exchanges, markets and capabilities without fetching prices. The leading "
+    "arguments are positional; the rest are named, written name := value. Funding rates are "
+    "decimals per funding interval where positive means longs pay shorts, with an annualized "
+    "column alongside."
 )
 
 SCHEMA_DOC_MD = (
     "## main\n\n"
-    "The starter template's example functions, one per common worker pattern.\n\n"
-    "- **Scalars** answer one question per row and slot into a projection or predicate.\n"
-    "- **Table functions** return sets of rows, streamed to DuckDB in Arrow batches.\n"
-    "- **REST readers** page through an HTTP API and authenticate with a DuckDB secret."
+    "Public crypto market data through CCXT.\n\n"
+    "- **History** pages through a time window and streams one exchange page per batch.\n"
+    "- **Snapshots** return the current quote or book, and can fan out across exchanges.\n"
+    "- **Derivatives** cover perpetual funding (decimal per interval, positive = longs pay) and "
+    "open interest.\n"
+    "- **Reference** data lists exchanges, markets and per-exchange capabilities."
 )
 
 AGENT_TEST_TASKS = [
-    {"name": "formal_greeting", "prompt": "Using the ccxt worker, greet the name 'Grace' formally."},
     {
-        "name": "sum_of_squares",
-        "prompt": "Using the ccxt worker, what is the sum of the squared column for the first 10 rows "
-        "of the sequence with the default step?",
+        "name": "kraken_supports_ohlcv",
+        "prompt": "Using the ccxt worker, does the Kraken exchange support fetching OHLCV candles?",
     },
     {
-        "name": "stepped_sequence",
-        "prompt": "List the n values of a 4-row sequence that steps by 5, in ascending order.",
+        "name": "exchanges_with_funding_history",
+        "prompt": "Using the ccxt worker, how many exchanges support fetching funding rate history?",
     },
     {
-        "name": "items_per_category",
-        "prompt": (
-            "The items API is running at https://vgi-starter-api.query-farm.services/v1. "
-            "How many items does it have in each category?"
-        ),
+        "name": "btc_daily_closes",
+        "prompt": "Using the ccxt worker, list Coinbase's daily BTC/USD closing prices for the first week "
+        "of January 2025, oldest first.",
+    },
+    {
+        "name": "okx_funding_january",
+        "prompt": "Using the ccxt worker, what was the average annualized funding rate of the "
+        "BTC/USDT:USDT perpetual on OKX during January 2025?",
+    },
+    {
+        "name": "btc_spread_kraken_coinbase",
+        "prompt": "Using the ccxt worker, what is the current bid-ask spread of BTC/USD on Kraken and on Coinbase?",
+    },
+    {
+        "name": "kraken_recent_trade_count",
+        "prompt": "Using the ccxt worker, how many trades are in Kraken's most recent page of BTC/USD trades?",
+    },
+    {
+        "name": "kraken_book_liquidity",
+        "prompt": "Using the ccxt worker, how much BTC is resting in the top 10 bid levels of Kraken's BTC/USD book?",
+    },
+    {
+        "name": "okx_btc_perpetuals",
+        "prompt": "Using the ccxt worker, which BTC perpetual swaps does OKX list?",
+    },
+    {
+        "name": "okx_current_funding",
+        "prompt": "Using the ccxt worker, what is the annualized funding rate of OKX's BTC/USDT:USDT "
+        "perpetual right now?",
+    },
+    {
+        "name": "okx_open_interest",
+        "prompt": "Using the ccxt worker, what is the open interest of OKX's BTC/USDT:USDT perpetual?",
     },
 ]
 
 CATALOG_TAGS = {
-    "vgi.title": "VGI Ccxt Worker",
-    "vgi.subtitle": "Example DuckDB functions to rename and replace: a scalar, a table function and a REST API reader.",
+    "vgi.title": "Crypto Market Data",
+    "vgi.subtitle": "Candles, quotes, order books, trades and perpetual funding from 100+ crypto exchanges.",
     "vgi.doc_llm": CATALOG_DOC_LLM,
     "vgi.doc_md": CATALOG_DOC_MD,
     "vgi.source_url": SOURCE_URL,
     "vgi.icon_url": "https://query.farm/media-kit/products/vgi/vgi-logo.png",
-    "vgi.license": "0BSD",
+    "vgi.license": "MIT",
     "vgi.author": "Query.Farm",
-    "vgi.copyright": "Copyright 2026 Query.Farm LLC",
-    "vgi.keywords": keywords_array("vgi, duckdb, starter template, example worker, rest api, table function"),
+    "vgi.copyright": "Copyright 2026 Query Farm LLC - https://query.farm",
+    "vgi.keywords": keywords_array(
+        "crypto, cryptocurrency, bitcoin, ccxt, exchange, market data, ohlcv, candles, order book, "
+        "funding rate, perpetual swap, open interest"
+    ),
     "vgi.support_contact": f"{SOURCE_URL}/issues",
     "vgi.support_policy_url": f"{SOURCE_URL}#support",
-    # Public analyst tasks for `vgi-lint simulate`; private graders live in vgi-agent-tests.yaml.
     "vgi.agent_test_tasks": json.dumps(AGENT_TEST_TASKS),
 }

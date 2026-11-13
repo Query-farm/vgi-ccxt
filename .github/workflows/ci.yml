@@ -68,20 +68,15 @@ jobs:
           else bin="$PWD/.venv/bin"; tools="$PWD/.tools/bin"; exe=""; fi
           export WORKER="$bin/vgi-ccxt-worker$exe"
           export HAYBARN_UNITTEST="$tools/haybarn-unittest$exe"
-          export RECIPES_WORKER="$bin/python$exe $PWD/examples/run.py"
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            # Native python.exe can't open MSYS paths (/d/a/...), and MSYS rewrites
-            # path-like env vars it passes to native programs (mangling "D:/a" into
-            # "D;A:\"). Hand over Windows paths and exclude the variable from rewriting.
-            winbin="$(cygpath -m "$bin")"; winroot="$(cygpath -m "$PWD")"
-            RECIPES_WORKER="$winbin/python.exe $winroot/examples/run.py"
-            export MSYS2_ENV_CONV_EXCL=RECIPES_WORKER
-          fi
-          TRANSPORT=${{ matrix.transport }} PYTHON="uv run --no-project python" ci/run-integration.sh
+          TRANSPORT=${{ matrix.transport }} ci/run-integration.sh
 
   metadata:
     name: Metadata quality (vgi-lint)
     runs-on: ubuntu-latest
+    env:
+      # Examples execute against the offline fixture exchanges, as in `make lint-explain`:
+      # deterministic, and immune to exchange geo-blocks on CI runners.
+      VGI_CCXT_FIXTURES: ${{ github.workspace }}/test/fixtures/exchanges.json
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -96,7 +91,7 @@ jobs:
           location: ${{ github.workspace }}/.venv/bin/vgi-ccxt-worker
           # Set in vgi-lint.toml, so local runs and CI agree.
           fail-on: ${{ steps.lintcfg.outputs.fail_on }}
-          # Set to false if your examples need real credentials or network access.
+          # Executes against the fixtures above, never the network.
           execute: true
 
   docker:

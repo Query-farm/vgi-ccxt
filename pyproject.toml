@@ -7,6 +7,7 @@ license = "MIT-0"
 license-files = ["LICENSE"]
 requires-python = ">=3.13"
 dependencies = [
+    "ccxt>=4.5.92",
     # [http] adds the HTTP transport (`--http`) used by Docker deploys.
     # SDK bumps go through the template (minor bumps can raise the protocol).
     "vgi-python[http]>=0.51.0,<0.52",
@@ -49,11 +50,16 @@ ignore = ["D203", "D213", "RUF012"]
 [tool.mypy]
 strict = true
 python_version = "3.13"
-files = ["src", "tests", "examples"]
+files = ["src", "tests"]
 
 [[tool.mypy.overrides]]
 module = ["vgi.*", "vgi_rpc.*"]
 follow_untyped_imports = true
+
+[[tool.mypy.overrides]]
+# ccxt ships no type information.
+module = ["ccxt", "ccxt.*"]
+ignore_missing_imports = true
 
 [tool.pydoclint]
 style = "google"

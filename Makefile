@@ -11,7 +11,7 @@ HAYBARN_UNITTEST := $(TOOLS)/bin/haybarn-unittest
 TRANSPORT       ?= stdio
 
 .DEFAULT_GOAL := help
-.PHONY: help build test test-unit test-sql test-sql-all lint lint-explain lint-ai fmt check run run-http debug tools template-diff clean
+.PHONY: help build test test-unit test-sql test-sql-all lint lint-explain lint-live live-check lint-ai fmt check run run-http debug tools template-diff clean
 
 help: ## List the targets
 	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z_-]+:.*## /{printf "  %-14s %s\n",$$1,$$2}' $(MAKEFILE_LIST)
@@ -24,12 +24,12 @@ tools: ## Install the pinned SQL test runner into .tools
 	@test -x $(HAYBARN_UNITTEST) || { uv venv -q $(TOOLS) && uv pip install -q -p $(TOOLS) haybarn-unittest==$(HAYBARN_VERSION); }
 
 fmt: ## Format the code
-	uv run ruff format src tests test examples examples
-	uv run ruff check --fix src tests test examples examples
+	uv run ruff format src tests test
+	uv run ruff check --fix src tests test
 
 lint: build ## Static checks: ruff, mypy, pydoclint
-	uv run ruff format --check src tests test examples examples
-	uv run ruff check src tests test examples examples
+	uv run ruff format --check src tests test
+	uv run ruff check src tests test
 	uv run mypy
 	uvx pydoclint --config=pyproject.toml src
 
@@ -37,7 +37,7 @@ test-unit: build ## Unit tests (pytest)
 	uv run pytest -q
 
 test-sql: build tools ## SQL tests through DuckDB: make test-sql TRANSPORT=stdio|launch|http
-	WORKER=$(WORKER) RECIPES_WORKER="$(CURDIR)/.venv/bin/python $(CURDIR)/examples/run.py" HAYBARN_UNITTEST=$(HAYBARN_UNITTEST) TRANSPORT=$(TRANSPORT) PYTHON="uv run --no-project python" ci/run-integration.sh
+	WORKER=$(WORKER) HAYBARN_UNITTEST=$(HAYBARN_UNITTEST) TRANSPORT=$(TRANSPORT) ci/run-integration.sh
 
 test-sql-all: ## SQL tests over every transport
 	$(MAKE) test-sql TRANSPORT=stdio
@@ -46,11 +46,19 @@ test-sql-all: ## SQL tests over every transport
 
 test: test-unit test-sql ## Unit + SQL tests
 
-lint-explain: build ## Metadata quality report (vgi-lint, settings in vgi-lint.toml). LINT_ARGS="--format agent" for agents
-	$(VGI_LINT) "$(WORKER)" $(LINT_ARGS)
+# The metadata check executes every example. It runs against the offline fixture
+# exchanges (test/fixtures/exchanges.json) so it is deterministic and never touches
+# the network; `make lint-live` runs the same check against the real exchanges.
+FIXTURES        := $(CURDIR)/test/fixtures/exchanges.json
 
-lint-ai: ## Opt-in L3 check: an agent runs vgi-agent-tests.yaml and docs are reviewed (needs the claude CLI)
-	@$(MAKE) --no-print-directory lint-explain LINT_ARGS="--ai $(LINT_ARGS)"
+lint-explain: build ## Metadata quality report (vgi-lint, settings in vgi-lint.toml), against the offline fixtures
+	VGI_CCXT_FIXTURES=$(FIXTURES) $(VGI_LINT) "$(WORKER)" $(LINT_ARGS)
+
+lint-live: build ## The metadata check against the real exchanges (network; results vary by region)
+	env -u VGI_CCXT_FIXTURES $(VGI_LINT) "$(WORKER)" $(LINT_ARGS)
+
+lint-ai: ## Opt-in L3 check against the real exchanges: an agent runs vgi-agent-tests.yaml (needs the claude CLI)
+	@$(MAKE) --no-print-directory lint-live LINT_ARGS="--ai $(LINT_ARGS)"
 
 check: lint test-unit test-sql-all lint-explain ## Everything CI runs. Done = this passes.
 
@@ -61,7 +69,7 @@ run-http: build ## Serve over HTTP on port 8000
 	$(WORKER) --http --host 127.0.0.1 --port 8000
 
 debug: build tools ## Run one query against the worker with debug logging on stderr
-	@printf "LOAD vgi;\nATTACH 'ccxt' (TYPE vgi, LOCATION '$(WORKER) --debug');\nSELECT ccxt.main.greet('debug');\n" \
+	@printf "LOAD vgi;\nATTACH 'ccxt' (TYPE vgi, LOCATION '$(WORKER) --debug');\nSELECT * FROM ccxt.main.has('kraken') WHERE exposed_by_worker;\n" \
 	  | uvx --from haybarn-cli==$(HAYBARN_VERSION) haybarn -no-agent
 
 template-diff: ## Show upstream template changes since this project was created
