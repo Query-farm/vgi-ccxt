@@ -16,9 +16,9 @@ from typing import Any
 
 import pyarrow as pa
 
-CATALOG_NAME = "starter"
+CATALOG_NAME = "ccxt"
 
-SOURCE_URL = "https://github.com/Query-farm/vgi-starter-python"
+SOURCE_URL = "https://github.com/your-org/vgi-ccxt"
 
 # Categories group functions in docs and agent tools. Every object's
 # ``vgi.category`` must name one of these.
@@ -62,7 +62,7 @@ CATALOG_DOC_LLM = (
 )
 
 CATALOG_DOC_MD = (
-    "# VGI starter worker\n\n"
+    "# VGI ccxt worker\n\n"
     "**An example [VGI](https://query.farm/vgi) worker that brings custom functions into DuckDB "
     "SQL.** It was generated from the Query.Farm starter template and is meant to be renamed and "
     "rewritten: every function here demonstrates one pattern you will reuse.\n\n"
@@ -85,7 +85,7 @@ SCHEMA_DOC_LLM = (
     "`count` rows of `(n, squared)`; use it for demos, tests, and as a template for generators. "
     "`fetch_items(base_url, page_size := 100)` reads every item from a paginated JSON REST API as "
     "`(id, name, category, price)` rows, streaming one page per batch, retrying rate-limited "
-    "requests, and authenticating with a `starter_api` DuckDB secret or the `STARTER_API_TOKEN` "
+    "requests, and authenticating with a `ccxt_api` DuckDB secret or the `CCXT_API_TOKEN` "
     "environment variable. Scalars cannot take named arguments; table functions can."
 )
 
@@ -98,10 +98,10 @@ SCHEMA_DOC_MD = (
 )
 
 AGENT_TEST_TASKS = [
-    {"name": "formal_greeting", "prompt": "Using the starter worker, greet the name 'Grace' formally."},
+    {"name": "formal_greeting", "prompt": "Using the ccxt worker, greet the name 'Grace' formally."},
     {
         "name": "sum_of_squares",
-        "prompt": "Using the starter worker, what is the sum of the squared column for the first 10 rows "
+        "prompt": "Using the ccxt worker, what is the sum of the squared column for the first 10 rows "
         "of the sequence with the default step?",
     },
     {
@@ -118,7 +118,7 @@ AGENT_TEST_TASKS = [
 ]
 
 CATALOG_TAGS = {
-    "vgi.title": "VGI Starter Worker",
+    "vgi.title": "VGI Ccxt Worker",
     "vgi.subtitle": "Example DuckDB functions to rename and replace: a scalar, a table function and a REST API reader.",
     "vgi.doc_llm": CATALOG_DOC_LLM,
     "vgi.doc_md": CATALOG_DOC_MD,

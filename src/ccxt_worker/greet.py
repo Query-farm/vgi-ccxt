@@ -56,7 +56,7 @@ class Greet(ScalarFunction):
                 "Return a **casual greeting** for each input name: `greet('Ada')` returns "
                 "`'Hi, Ada!'`. NULL names produce NULL. This is the one-argument overload; "
                 "call `greet(name, style)` for the formal tone. It is a vectorized scalar, "
-                "so it works over a whole column: `SELECT starter.main.greet(name) FROM people`."
+                "so it works over a whole column: `SELECT ccxt.main.greet(name) FROM people`."
             ),
             doc_md=(
                 "## greet(name)\n\n"
@@ -66,7 +66,7 @@ class Greet(ScalarFunction):
         )
         examples = [
             FunctionExample(
-                sql="SELECT starter.main.greet('Ada') AS greeting",
+                sql="SELECT ccxt.main.greet('Ada') AS greeting",
                 description="Greet one name casually",
             ),
         ]
@@ -105,7 +105,7 @@ class GreetWithStyle(ScalarFunction):
         )
         examples = [
             FunctionExample(
-                sql="SELECT starter.main.greet('Ada', 'formal') AS greeting",
+                sql="SELECT ccxt.main.greet('Ada', 'formal') AS greeting",
                 description="Greet one name formally",
             ),
         ]

@@ -1,0 +1,1 @@
+"""VGI ccxt worker package."""

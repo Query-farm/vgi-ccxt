@@ -12,5 +12,8 @@
   "optional_files": [
     ".github/workflows/nightly.yml",
     ".github/dependabot.yml"
-  ]
+  ],
+  "name": "ccxt",
+  "repo": "your-org/vgi-ccxt",
+  "initialized": "2026-11-12"
 }

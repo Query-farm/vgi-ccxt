@@ -16,7 +16,7 @@
 #   PYTHON            command for the mock API, may contain spaces (default: python3)
 #   MIN_EXECUTED      fail if fewer test cases ran (default: 1)
 #   EXPECTED_SKIP_REASONS  newline-separated skip reasons that are allowed,
-#                     e.g. "require-env STARTER_LIVE". Any other skip fails.
+#                     e.g. "require-env CCXT_LIVE". Any other skip fails.
 #   RECIPES_WORKER    command that runs a recipe by name (`$RECIPES_WORKER <recipe>`);
 #                     when set, examples/test/*.test run too (stdio/launch only)
 #   KEEP_STAGE=1      keep the staged test tree for debugging
@@ -73,20 +73,20 @@ start_server() {
 
 # The mock APIs fetch_items is tested against. The plain one rate-limits every
 # page once (429 + Retry-After) so the retry path is always exercised.
-unset STARTER_API_TOKEN
+unset CCXT_API_TOKEN
 MOCK_API_FLAKY=1 start_server "$STAGE/mock.log" $PYTHON "$REPO/test/mock_api/server.py"
-export STARTER_MOCK_API="http://127.0.0.1:$PORT"
+export CCXT_MOCK_API="http://127.0.0.1:$PORT"
 MOCK_API_TOKEN=test-token start_server "$STAGE/mock-auth.log" $PYTHON "$REPO/test/mock_api/server.py"
-export STARTER_MOCK_API_AUTH="http://127.0.0.1:$PORT"
+export CCXT_MOCK_API_AUTH="http://127.0.0.1:$PORT"
 
 HTTP=0
 case "$TRANSPORT" in
-  stdio)  export STARTER_WORKER="$WORKER" ;;
-  launch) export STARTER_WORKER="launch:$WORKER" ;;
+  stdio)  export CCXT_WORKER="$WORKER" ;;
+  launch) export CCXT_WORKER="launch:$WORKER" ;;
   http)
     HTTP=1
     start_server "$STAGE/worker.log" "$WORKER" --http --port 0
-    export STARTER_WORKER="http://127.0.0.1:$PORT"
+    export CCXT_WORKER="http://127.0.0.1:$PORT"
     ;;
   *) echo "::error::unknown TRANSPORT=$TRANSPORT (expected stdio|launch|http)"; exit 1 ;;
 esac
@@ -124,10 +124,10 @@ EOF
 rm -f "$STAGE/test/_warm.test"
 
 cat > "$STAGE/no_error_skip.json" <<'EOF'
-{"skip_error_messages": ["__vgi_starter_never_matches__"]}
+{"skip_error_messages": ["__vgi_ccxt_never_matches__"]}
 EOF
 
-echo "Running test/sql over $TRANSPORT (worker: $STARTER_WORKER)"
+echo "Running test/sql over $TRANSPORT (worker: $CCXT_WORKER)"
 LOG="$STAGE/unittest.log"
 rc=0
 ( cd "$STAGE" && "$HAYBARN_UNITTEST" --keep-home --test-dir "$STAGE" \

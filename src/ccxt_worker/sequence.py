@@ -99,12 +99,12 @@ class SequenceTable(TableFunctionGenerator[SequenceArgs, SequenceState]):
                 [
                     {
                         "description": "Three rows stepping by two",
-                        "sql": "SELECT n, squared FROM starter.main.sequence_table(3, step := 2) ORDER BY n",
+                        "sql": "SELECT n, squared FROM ccxt.main.sequence_table(3, step := 2) ORDER BY n",
                         "expected_result": [[0, 0], [2, 4], [4, 16]],
                     },
                     {
                         "description": "Count the rows generated",
-                        "sql": "SELECT count(*) AS rows FROM starter.main.sequence_table(1000)",
+                        "sql": "SELECT count(*) AS rows FROM ccxt.main.sequence_table(1000)",
                         "expected_result": [[1000]],
                     },
                 ]
@@ -112,11 +112,11 @@ class SequenceTable(TableFunctionGenerator[SequenceArgs, SequenceState]):
         }
         examples = [
             FunctionExample(
-                sql="SELECT n, squared FROM starter.main.sequence_table(5) ORDER BY n",
+                sql="SELECT n, squared FROM ccxt.main.sequence_table(5) ORDER BY n",
                 description="The first five values and their squares",
             ),
             FunctionExample(
-                sql="SELECT n FROM starter.main.sequence_table(4, step := 10) ORDER BY n",
+                sql="SELECT n FROM ccxt.main.sequence_table(4, step := 10) ORDER BY n",
                 description="Four values stepping by ten",
             ),
         ]

@@ -8,8 +8,8 @@ stream each page to DuckDB as one Arrow batch.
 * **Politeness.** Requests time out, and 429/5xx responses are retried with
   backoff that honours ``Retry-After``.
 * **Credentials.** A bearer token comes from a DuckDB secret if one exists
-  (``CREATE SECRET (TYPE starter_api, TOKEN '...')``), otherwise from the
-  ``STARTER_API_TOKEN`` environment variable. The token is read from the secret
+  (``CREATE SECRET (TYPE ccxt_api, TOKEN '...')``), otherwise from the
+  ``CCXT_API_TOKEN`` environment variable. The token is read from the secret
   on every call and never stored in state, because state can travel back to
   DuckDB over HTTP.
 
@@ -44,13 +44,13 @@ from vgi_rpc import ArrowSerializableDataclass
 
 from .meta import column, object_tags
 
-SECRET_TYPE = "starter_api"
-TOKEN_ENV_VAR = "STARTER_API_TOKEN"
+SECRET_TYPE = "ccxt_api"
+TOKEN_ENV_VAR = "CCXT_API_TOKEN"
 TIMEOUT_SECONDS = 30.0
 MAX_ATTEMPTS = 4
-USER_AGENT = "vgi-starter-worker/0.1"
+USER_AGENT = "vgi-ccxt-worker/0.1"
 
-# Registered with DuckDB so users can run CREATE SECRET (TYPE starter_api, TOKEN '...').
+# Registered with DuckDB so users can run CREATE SECRET (TYPE ccxt_api, TOKEN '...').
 API_SECRET_TYPE = SecretTypeSpec(
     name=SECRET_TYPE,
     description="Bearer token for the API that fetch_items reads.",
@@ -151,16 +151,16 @@ class FetchItems(TableFunctionGenerator[FetchArgs, FetchState]):
                     "Read all items from a paginated JSON REST API at `base_url` and return them as "
                     "rows `(id, name, category, price)`. Pages are requested `page_size` at a time "
                     "(named argument, default 100) and streamed to DuckDB as they arrive. If a "
-                    "DuckDB secret of type `starter_api` exists its `token` is sent as a bearer "
-                    "token; otherwise the `STARTER_API_TOKEN` environment variable is used. "
+                    "DuckDB secret of type `ccxt_api` exists its `token` is sent as a bearer "
+                    "token; otherwise the `CCXT_API_TOKEN` environment variable is used. "
                     "Rate-limit (429) and server errors are retried with backoff."
                 ),
                 doc_md=(
                     "## fetch_items(base_url, page_size := 100)\n\n"
                     "Every item from a paginated REST API, streamed one page per batch.\n\n"
-                    "Authenticate with a `starter_api` secret or the `STARTER_API_TOKEN` "
+                    "Authenticate with a `ccxt_api` secret or the `CCXT_API_TOKEN` "
                     "environment variable:\n\n"
-                    "```sql\nCREATE SECRET (TYPE starter_api, TOKEN 'your-token');\n```"
+                    "```sql\nCREATE SECRET (TYPE ccxt_api, TOKEN 'your-token');\n```"
                 ),
             ),
             "vgi.result_columns_schema": json.dumps(
@@ -176,7 +176,7 @@ class FetchItems(TableFunctionGenerator[FetchArgs, FetchState]):
             FunctionExample(
                 sql=(
                     "SELECT id, name, price "
-                    "FROM starter.main.fetch_items('https://vgi-starter-api.query-farm.services/v1') "
+                    "FROM ccxt.main.fetch_items('https://vgi-starter-api.query-farm.services/v1') "
                     "WHERE category = 'hardware' ORDER BY price DESC LIMIT 5"
                 ),
                 description="The five priciest hardware items from the public demo API",
@@ -184,7 +184,7 @@ class FetchItems(TableFunctionGenerator[FetchArgs, FetchState]):
             FunctionExample(
                 sql=(
                     "SELECT category, count(*) AS items, avg(price) AS avg_price "
-                    "FROM starter.main.fetch_items("
+                    "FROM ccxt.main.fetch_items("
                     "'https://vgi-starter-api.query-farm.services/v1', page_size := 10) "
                     "GROUP BY category ORDER BY category"
                 ),
@@ -197,9 +197,9 @@ class FetchItems(TableFunctionGenerator[FetchArgs, FetchState]):
         cls,
         params: BindParams[FetchArgs],
         *,
-        starter_api: Annotated[dict[str, pa.Scalar[Any]] | None, Secret(SECRET_TYPE)] = None,
+        ccxt_api: Annotated[dict[str, pa.Scalar[Any]] | None, Secret(SECRET_TYPE)] = None,
     ) -> BindResponse:
-        """Declare the output schema and ask DuckDB for the optional ``starter_api`` secret."""
+        """Declare the output schema and ask DuckDB for the optional ``ccxt_api`` secret."""
         return BindResponse(output_schema=OUTPUT_SCHEMA)
 
     @classmethod

@@ -1,5 +1,5 @@
 [project]
-name = "vgi-starter-worker"
+name = "vgi-ccxt-worker"
 version = "0.1.0"
 description = "A VGI worker for DuckDB, generated from the Query.Farm VGI starter template."
 readme = "README.md"
@@ -9,17 +9,17 @@ requires-python = ">=3.13"
 dependencies = [
     # [http] adds the HTTP transport (`--http`) used by Docker deploys.
     # SDK bumps go through the template (minor bumps can raise the protocol).
-    "vgi-python[http]>=0.50.0,<0.51",
+    "vgi-python[http]>=0.51.0,<0.52",
 ]
 
 [project.scripts]
-vgi-starter-worker = "starter_worker.worker:main"
+vgi-ccxt-worker = "ccxt_worker.worker:main"
 
 [dependency-groups]
 dev = [
     # The pushdown recipe evaluates predicates locally; a worker that uses filter
     # pushdown must add the `haybarn` extra to its own dependencies.
-    "vgi-python[haybarn]>=0.50.0,<0.51",
+    "vgi-python[haybarn]>=0.51.0,<0.52",
     "pytest>=8.4",
     "mypy>=1.18",
     "ruff>=0.14",
@@ -31,7 +31,7 @@ requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/starter_worker"]
+packages = ["src/ccxt_worker"]
 
 [tool.ruff]
 line-length = 120
