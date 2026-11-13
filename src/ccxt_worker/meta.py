@@ -121,7 +121,9 @@ SCHEMA_DOC_LLM = (
     "window with a since-cursor and accept `TIMESTAMP`, `DATE` or ISO-8601 string bounds; snapshot functions "
     "return the current state and some accept a list of exchanges to compare them side by side, "
     "reporting a per-exchange failure in an error column instead of failing the query. Reference "
-    "functions describe exchanges, markets and capabilities without fetching prices. The leading "
+    "functions describe exchanges, markets and capabilities without fetching prices. A plain "
+    "`TIMESTAMP` bound is read as UTC; for a relative window pass a `TIMESTAMPTZ` such as "
+    "`now() - INTERVAL 1 DAY`, because `now()::TIMESTAMP` is local wall-clock time. The leading "
     "arguments are positional; the rest are named, written name := value. Funding rates are "
     "decimals per funding interval where positive means longs pay shorts, with an annualized "
     "column alongside."
@@ -152,9 +154,9 @@ AGENT_TEST_TASKS = [
         "of January 2025, oldest first.",
     },
     {
-        "name": "okx_funding_january",
+        "name": "okx_funding_last_month",
         "prompt": "Using the ccxt worker, what was the average annualized funding rate of the "
-        "BTC/USDT:USDT perpetual on OKX during January 2025?",
+        "BTC/USDT:USDT perpetual on OKX over the last 30 days?",
     },
     {
         "name": "btc_spread_kraken_coinbase",

@@ -62,6 +62,9 @@ lint-ai: ## Opt-in L3 check against the real exchanges: an agent runs vgi-agent-
 
 check: lint test-unit test-sql-all lint-explain ## Everything CI runs. Done = this passes.
 
+live-check: build ## Opt-in smoke test against Kraken, Coinbase and OKX public endpoints (network)
+	VGI_CCXT_LIVE=1 uv run pytest -q tests/test_live.py
+
 run: build ## Serve over stdio (what DuckDB launches)
 	$(WORKER)
 

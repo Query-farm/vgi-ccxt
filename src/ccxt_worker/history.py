@@ -14,6 +14,7 @@ Without ``since`` a function returns the single most recent page.
 
 from __future__ import annotations
 
+import datetime as dt
 import logging
 from dataclasses import dataclass, field
 from typing import Annotated, Any, ClassVar
@@ -30,9 +31,11 @@ from vgi.table_function import (
     init_single_worker,
 )
 from vgi_rpc import ArrowSerializableDataclass
+from vgi_rpc.log import Level
 
-from .client import PublicExchange, get_exchange, now_ms, parse_timeframe_ms
+from .client import PublicExchange, UntilRequiredError, get_exchange, now_ms, parse_timeframe_ms
 from .common import (
+    HOUR_MS,
     TIME_TYPES,
     TIMESTAMP,
     annualize,
@@ -52,6 +55,11 @@ MAX_MAX_ROWS = 10_000_000
 DEFAULT_PAGE = {"fetchOHLCV": 500, "fetchTrades": 500, "fetchFundingRateHistory": 200}
 #: A trades page made only of already-seen fills is refetched a millisecond later at most this often per tick.
 MAX_EMPTY_REFETCH = 5
+#: Time windows for exchanges whose trades endpoint needs an explicit ``until`` (Coinbase).
+WINDOW_START_MS = 10 * 60_000
+WINDOW_MIN_MS = 1_000
+WINDOW_MAX_MS = 6 * 3_600_000
+MAX_WINDOWS_PER_TICK = 50
 
 _MAX_ROWS_DOC = "Stop after this many rows (default 100,000)."
 
@@ -62,13 +70,47 @@ _SYMBOL: Arg[str] = Arg(
 
 
 def _window(since: Any, until: Any, since_name: str, until_name: str) -> tuple[int | None, int]:
-    """Validate and convert a window's bounds; a missing end means now."""
+    """Validate and convert a window's bounds; a missing end means now.
+
+    An explicit window that ends before it starts is an error. A start after a
+    defaulted end (a start in the future) is just an empty window: nothing has
+    happened there yet.
+    """
     start = time_arg_ms(since, since_name)
     end = time_arg_ms(until, until_name)
-    end = now_ms() if end is None else end
+    if end is None:
+        end = now_ms()
+        if start is not None and start >= end:
+            return start, start
     if start is not None and start >= end:
         raise ValueError(f"{since_name} must be earlier than {until_name}")
     return start, end
+
+
+def _is_empty(start: int | None, end: int) -> bool:
+    return start is not None and start >= end
+
+
+def _iso(ms: int) -> str:
+    return dt.datetime.fromtimestamp(ms / 1000, tz=dt.UTC).strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _warn_if_history_starts_late(
+    out: OutputCollector, exchange_id: str, what: str, since: int, first: int | None, slack_ms: int
+) -> None:
+    """Tell the caller when the exchange's first page starts well after ``since``.
+
+    Many exchanges keep only recent history (Kraken: the latest 720 candles; OKX: about
+    three months of funding) or ignore ``since`` entirely, and return later rows without
+    an error. The query is still correct for what the exchange has; this says why it is short.
+    """
+    if first is not None and first > since + slack_ms:
+        message = (
+            f"{exchange_id} returned {what} starting {_iso(first)}, after the requested start "
+            f"{_iso(since)}; the exchange probably keeps only recent history or ignores the start"
+        )
+        LOG.warning("%s", message)
+        out.client_log(Level.WARN, message)
 
 
 def _page_size(exchange: PublicExchange, capability: str, remaining: int) -> int:
@@ -163,7 +205,8 @@ class Ohlcv(TableFunctionGenerator[OhlcvArgs, OhlcvCursor]):
                     "candles (the exchange's default count). `ts` is the candle's open time in UTC; prices "
                     "are in the quote currency and volume in the base currency. Some exchanges keep only "
                     "recent history (Kraken serves the latest 720 candles), so an old `since` can return "
-                    "fewer rows than the window implies. An unsupported timeframe is rejected at bind with "
+                    "fewer rows than the window implies; the worker then logs a warning naming the first "
+                    "candle the exchange returned. An unsupported timeframe is rejected at bind with "
                     "the list the exchange offers."
                 ),
                 doc_md=(
@@ -211,7 +254,7 @@ class Ohlcv(TableFunctionGenerator[OhlcvArgs, OhlcvCursor]):
     def initial_state(cls, params: ProcessParams[OhlcvArgs]) -> OhlcvCursor:
         """Fix the window once, so a default ``until`` of now cannot move between pages."""
         since, until = _window(params.args.since, params.args.until, "since", "until")
-        return OhlcvCursor(next_since_ms=-1 if since is None else since, until_ms=until)
+        return OhlcvCursor(next_since_ms=-1 if since is None else since, until_ms=until, done=_is_empty(since, until))
 
     @classmethod
     def process(cls, params: ProcessParams[OhlcvArgs], state: OhlcvCursor, out: OutputCollector) -> None:
@@ -226,6 +269,11 @@ class Ohlcv(TableFunctionGenerator[OhlcvArgs, OhlcvCursor]):
         page = exchange.call(
             "fetch_ohlcv", args.symbol, args.timeframe, since, _page_size(exchange, "fetchOHLCV", remaining)
         )
+        if state.pages == 0 and since is not None:
+            first = min((int(c[0]) for c in page or [] if c and c[0] is not None), default=None)
+            _warn_if_history_starts_late(
+                out, exchange.id, "candles", since, first, 2 * parse_timeframe_ms(args.timeframe)
+            )
         state.pages += 1
         by_ts: dict[int, list[Any]] = {}
         for candle in page or []:
@@ -310,11 +358,15 @@ class TradesCursor(ArrowSerializableDataclass):
     ``next_since_ms`` is inclusive, because several fills can share the last
     millisecond of a page; ``boundary_keys`` are the fills already emitted at
     that millisecond, so the next page skips them instead of repeating them.
+    Exchanges that insist on an explicit window end (Coinbase) are walked in
+    ``window_ms`` windows instead; see ``_window_page``.
     """
 
     next_since_ms: int = -1
     until_ms: int = 0
     boundary_keys: list[str] = field(default_factory=list)
+    #: 0 while the exchange pages by ``since`` alone; otherwise the current window length.
+    window_ms: int = 0
     emitted: int = 0
     done: bool = False
 
@@ -346,9 +398,11 @@ class Trades(TableFunctionGenerator[TradesArgs, TradesCursor]):
                     "Public executed trades for one market. Positional: exchange id and unified symbol. "
                     "Named: `since` (inclusive start, UTC), `until` (exclusive end, default now) and "
                     "`max_rows` (default 100,000). With `since` the worker pages forward with a cursor that "
-                    "keeps fills sharing a millisecond intact across page boundaries; without `since` it "
-                    "returns the exchange's most recent page. Many exchanges only serve recent trades "
-                    "publicly (hours to days), so a deep `since` may start later than requested. `side` "
+                    "keeps fills sharing a millisecond intact across page boundaries (exchanges that need "
+                    "an explicit window end, such as Coinbase, are walked in self-sizing time windows); "
+                    "without `since` it returns the exchange's most recent page. Many exchanges only serve "
+                    "recent trades publicly (hours to days), so a deep `since` may start later than requested. "
+                    "`side` "
                     "is the taker side; `amount` is base currency; `cost` is price times amount."
                 ),
                 doc_md=(
@@ -387,11 +441,11 @@ class Trades(TableFunctionGenerator[TradesArgs, TradesCursor]):
     def initial_state(cls, params: ProcessParams[TradesArgs]) -> TradesCursor:
         """Fix the window once."""
         since, until = _window(params.args.since, params.args.until, "since", "until")
-        return TradesCursor(next_since_ms=-1 if since is None else since, until_ms=until)
+        return TradesCursor(next_since_ms=-1 if since is None else since, until_ms=until, done=_is_empty(since, until))
 
     @classmethod
     def process(cls, params: ProcessParams[TradesArgs], state: TradesCursor, out: OutputCollector) -> None:
-        """Fetch a page, drop fills already emitted at the boundary millisecond, emit the rest."""
+        """Fetch the next page (or window) of fills and emit the ones not yet emitted."""
         if state.done:
             out.finish()
             return
@@ -399,38 +453,20 @@ class Trades(TableFunctionGenerator[TradesArgs, TradesCursor]):
         exchange = get_exchange(args.exchange)
         remaining = args.max_rows - state.emitted
         size = _page_size(exchange, "fetchTrades", remaining)
-        fresh: list[dict[str, Any]] = []
-        for _ in range(MAX_EMPTY_REFETCH):
-            since = None if state.next_since_ms < 0 else state.next_since_ms
-            raw = [t for t in exchange.call("fetch_trades", args.symbol, since, size) or [] if t.get("timestamp")]
-            seen = set(state.boundary_keys)
-            fresh = []
-            for trade in sorted(raw, key=lambda t: (int(t["timestamp"]), _trade_key(t))):
-                ts = int(trade["timestamp"])
-                if ts >= state.until_ms or (since is not None and ts < since):
-                    continue
-                key = _trade_key(trade)
-                if since is not None and ts == since and key in seen:
-                    continue
-                if key in {_trade_key(t) for t in fresh}:
-                    continue
-                fresh.append(trade)
-            # A full page of nothing but already-emitted fills at one millisecond: step past it.
-            if not fresh and since is not None and len(raw) >= size and all(int(t["timestamp"]) == since for t in raw):
-                LOG.warning("%s: more than %d trades at %d ms; skipping ahead 1 ms", exchange.id, size, since)
-                state.next_since_ms, state.boundary_keys = since + 1, []
-                continue
-            break
-        fresh = fresh[-remaining:] if since is None else fresh[:remaining]
-        if not fresh:
+        fresh: list[dict[str, Any]] | None = None
+        if state.window_ms == 0:
+            try:
+                fresh = _cursor_page(exchange, args.symbol, state, size, remaining)
+            except UntilRequiredError:
+                LOG.info("%s fetchTrades needs an explicit until; paging by time window", exchange.id)
+                state.window_ms = WINDOW_START_MS
+        if fresh is None:
+            fresh = _window_page(exchange, args.symbol, state, size, remaining)
+        if not fresh and (state.done or state.window_ms == 0):
             out.finish()
             return
-        last = int(fresh[-1]["timestamp"])
-        keys_at_last = [_trade_key(t) for t in fresh if int(t["timestamp"]) == last]
-        state.boundary_keys = (state.boundary_keys if last == state.next_since_ms else []) + keys_at_last
-        state.next_since_ms = last
         state.emitted += len(fresh)
-        state.done = since is None or state.emitted >= args.max_rows
+        state.done = state.done or state.emitted >= args.max_rows
         out.emit(
             pa.RecordBatch.from_pydict(
                 {
@@ -447,6 +483,91 @@ class Trades(TableFunctionGenerator[TradesArgs, TradesCursor]):
                 schema=params.output_schema,
             )
         )
+
+
+def _select_trades(raw: list[dict[str, Any]], since: int | None, end: int, skip: set[str]) -> list[dict[str, Any]]:
+    """Return fills in ``[since, end)``, oldest first, minus repeats and the ``skip`` keys at ``since``."""
+    fresh: list[dict[str, Any]] = []
+    keys: set[str] = set()
+    for trade in sorted(raw, key=lambda t: (int(t["timestamp"]), _trade_key(t))):
+        ts = int(trade["timestamp"])
+        key = _trade_key(trade)
+        if ts >= end or (since is not None and (ts < since or (ts == since and key in skip))) or key in keys:
+            continue
+        keys.add(key)
+        fresh.append(trade)
+    return fresh
+
+
+def _fetch_trades(
+    exchange: PublicExchange, symbol: str, since: int | None, size: int, until_ms: int | None = None
+) -> list[dict[str, Any]]:
+    page = exchange.call("fetch_trades", symbol, since, size, until_ms=until_ms) or []
+    return [t for t in page if t.get("timestamp")]
+
+
+def _cursor_page(
+    exchange: PublicExchange, symbol: str, state: TradesCursor, size: int, remaining: int
+) -> list[dict[str, Any]]:
+    """Page forward by ``since`` alone, as most exchanges allow."""
+    fresh: list[dict[str, Any]] = []
+    since: int | None = None
+    for _ in range(MAX_EMPTY_REFETCH):
+        since = None if state.next_since_ms < 0 else state.next_since_ms
+        raw = _fetch_trades(exchange, symbol, since, size)
+        fresh = _select_trades(raw, since, state.until_ms, set(state.boundary_keys))
+        # A full page of nothing but already-emitted fills at one millisecond: step past it.
+        if not fresh and since is not None and len(raw) >= size and all(int(t["timestamp"]) == since for t in raw):
+            LOG.warning("%s: more than %d trades at %d ms; skipping ahead 1 ms", exchange.id, size, since)
+            state.next_since_ms, state.boundary_keys = since + 1, []
+            continue
+        break
+    fresh = fresh[-remaining:] if since is None else fresh[:remaining]
+    if not fresh:
+        state.done = True
+        return fresh
+    last = int(fresh[-1]["timestamp"])
+    keys_at_last = [_trade_key(t) for t in fresh if int(t["timestamp"]) == last]
+    state.boundary_keys = (state.boundary_keys if last == state.next_since_ms else []) + keys_at_last
+    state.next_since_ms = last
+    state.done = since is None
+    return fresh
+
+
+def _window_page(
+    exchange: PublicExchange, symbol: str, state: TradesCursor, size: int, remaining: int
+) -> list[dict[str, Any]]:
+    """Walk ``[since, until)`` in explicit time windows, for exchanges that require ``until``.
+
+    A window that comes back full (as many fills as the page size) may have been
+    truncated, so it is halved and fetched again; sparse windows double, up to
+    ``WINDOW_MAX_MS``. Fills at or after a window's end are left for the next
+    window, so nothing repeats.
+    """
+    for _ in range(MAX_WINDOWS_PER_TICK):
+        since = state.next_since_ms
+        if since >= state.until_ms:
+            state.done = True
+            return []
+        end = min(since + state.window_ms, state.until_ms)
+        # Exchanges round `until` to their own resolution (Coinbase: whole seconds) and differ on
+        # whether it is inclusive, so ask through `end` and drop anything at or after it.
+        raw = _fetch_trades(exchange, symbol, since, size, until_ms=end)
+        if len(raw) >= size and state.window_ms > WINDOW_MIN_MS:
+            state.window_ms = max(WINDOW_MIN_MS, state.window_ms // 2 // 1000 * 1000)
+            continue
+        if len(raw) >= size:
+            LOG.warning(
+                "%s: %d+ trades within %d ms at %d; the page may be truncated", exchange.id, size, end - since, since
+            )
+        fresh = _select_trades(raw, since, end, set())
+        state.next_since_ms, state.boundary_keys = end, []
+        state.done = end >= state.until_ms
+        if len(raw) < size // 4:
+            state.window_ms = min(WINDOW_MAX_MS, state.window_ms * 2)
+        if fresh or state.done:
+            return fresh[:remaining]
+    return []
 
 
 # =============================================================================
@@ -557,8 +678,11 @@ class FundingRates(TableFunctionGenerator[FundingRatesArgs, FundingCursor]):
                     "convention positive = longs pay shorts; `interval_hours` is inferred from the spacing "
                     "of settlements (exchanges use 1, 4 or 8 hours and some switch); "
                     "`funding_rate_annualized` multiplies by intervals per 365-day year. Without "
-                    "`start_date` only the latest page is returned. Fails with a clear error on exchanges "
-                    "without fetchFundingRateHistory (spot-only venues such as Kraken or Coinbase)."
+                    "`start_date` only the latest page is returned. Retention differs by venue: Hyperliquid "
+                    "serves long history, OKX about three months, KuCoin about one, Gate 180 days, and "
+                    "Bitget only its latest page; when an exchange starts later than `start_date` the "
+                    "worker logs a warning and returns what the exchange has. Fails with a clear error on "
+                    "exchanges without fetchFundingRateHistory (spot-only venues such as Kraken or Coinbase)."
                 ),
                 doc_md=(
                     "## funding_rates(exchange, symbol, start_date := …, end_date := …, max_rows := 100000)\n\n"
@@ -573,9 +697,9 @@ class FundingRates(TableFunctionGenerator[FundingRatesArgs, FundingCursor]):
                 sql=(
                     "SELECT avg(funding_rate_annualized) AS avg_apr "
                     "FROM ccxt.main.funding_rates('okx', 'BTC/USDT:USDT', "
-                    "start_date := DATE '2025-01-01', end_date := DATE '2025-02-01')"
+                    "start_date := current_date - INTERVAL 30 DAY)"
                 ),
-                description="Average annualized BTC perpetual funding on OKX in January 2025",
+                description="Average annualized BTC perpetual funding on OKX over the last 30 days",
             ),
             FunctionExample(
                 sql=(
@@ -598,7 +722,7 @@ class FundingRates(TableFunctionGenerator[FundingRatesArgs, FundingCursor]):
     def initial_state(cls, params: ProcessParams[FundingRatesArgs]) -> FundingCursor:
         """Fix the window once."""
         start, end = _window(params.args.start_date, params.args.end_date, "start_date", "end_date")
-        return FundingCursor(next_since_ms=-1 if start is None else start, until_ms=end)
+        return FundingCursor(next_since_ms=-1 if start is None else start, until_ms=end, done=_is_empty(start, end))
 
     @classmethod
     def _declared_interval(cls, exchange: PublicExchange, symbol: str) -> float | None:
@@ -624,6 +748,9 @@ class FundingRates(TableFunctionGenerator[FundingRatesArgs, FundingCursor]):
         since = None if state.next_since_ms < 0 else state.next_since_ms
         size = _page_size(exchange, "fetchFundingRateHistory", remaining)
         page = exchange.call("fetch_funding_rate_history", args.symbol, since, size) or []
+        if state.prev_ts < 0 and since is not None:
+            first = min((int(r["timestamp"]) for r in page if r.get("timestamp") is not None), default=None)
+            _warn_if_history_starts_late(out, exchange.id, "funding settlements", since, first, 25 * HOUR_MS)
         by_ts: dict[int, dict[str, Any]] = {}
         for row in page:
             ts = row.get("timestamp")

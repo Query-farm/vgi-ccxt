@@ -177,7 +177,8 @@
         "fetchOpenInterest": false
       },
       "limits": {
-        "ohlcv": 300
+        "ohlcv": 300,
+        "trades": 50
       },
       "errors": {
         "fetchTicker": {
@@ -208,7 +209,8 @@
           "price": 3290,
           "start": "2025-01-01T00:00:00Z"
         }
-      }
+      },
+      "trades_require_until": true
     },
     "okx": {
       "name": "OKX",

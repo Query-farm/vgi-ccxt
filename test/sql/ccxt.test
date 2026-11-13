@@ -13,62 +13,91 @@ require-env VGI_CCXT_FIXTURES
 statement ok
 ATTACH 'ccxt' (TYPE vgi, LOCATION '{CCXT_WORKER}');
 
+# Every query compares its result as VARCHAR (SELECT COLUMNS(*)::VARCHAR FROM (...)): the
+# sqllogictest runner compares numeric values only approximately, which would let an
+# off-by-one price or a wrong sum pass.
+
 # ------------------------------------------------------------------- ohlcv
 
 # 30 days of hourly candles = 720 rows over 8 exchange pages of 100. Over HTTP each
 # page is a separate request, so this only passes if the since-cursor travels with it.
-query IIIII
+query TTTTT
+SELECT COLUMNS(*)::VARCHAR FROM (
 SELECT count(*), count(DISTINCT ts), min(ts), max(ts), sum(volume)
 FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1h',
-                     since := TIMESTAMP '2024-01-01', until := TIMESTAMP '2024-01-31');
+                     since := TIMESTAMP '2024-01-01', until := TIMESTAMP '2024-01-31')
+);
 ----
 720	720	2024-01-01 00:00:00	2024-01-30 23:00:00	10440.0
 
 # No gaps: every consecutive pair is exactly one hour apart.
-query I
+query T
+SELECT COLUMNS(*)::VARCHAR FROM (
 SELECT count(*) FROM (
   SELECT ts - lag(ts) OVER (ORDER BY ts) AS gap
   FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1h', since := TIMESTAMP '2024-01-01', until := TIMESTAMP '2024-01-31')
-) WHERE gap IS NOT NULL AND gap <> INTERVAL 1 HOUR;
+) WHERE gap IS NOT NULL AND gap <> INTERVAL 1 HOUR
+);
 ----
 0
 
-query RRRRR
+query TTTTT
+SELECT COLUMNS(*)::VARCHAR FROM (
 SELECT open, high, low, close, volume
 FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1d', since := DATE '2024-01-01', until := DATE '2024-01-04')
-ORDER BY ts;
+ORDER BY ts
+);
 ----
 40000.0	40002.0	39995.0	39997.0	10.0
 40001.0	40003.0	39997.0	39999.0	11.0
-40002.0	40003.0	39999.0	40001.0	12.0
+40002.0	40004.0	39999.0	40001.0	12.0
+
+# A TIMESTAMPTZ bound is converted to UTC: 2024-01-01 05:00-05 is 2024-01-01 10:00 UTC.
+query TT
+SELECT COLUMNS(*)::VARCHAR FROM (
+SELECT count(*), min(ts) FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1h',
+                     since := TIMESTAMPTZ '2024-01-01 05:00:00-05', until := TIMESTAMP '2024-01-01 12:00:00')
+);
+----
+2	2024-01-01 10:00:00
 
 # The window runs past the data: the backfill stops on the first empty page.
-query II
-SELECT count(*), max(ts) FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1d', since := '2024-02-20T00:00:00Z');
+query TT
+SELECT COLUMNS(*)::VARCHAR FROM (
+SELECT count(*), max(ts) FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1d', since := '2024-02-20T00:00:00Z')
+);
 ----
 10	2024-02-29 00:00:00
 
 # A window with no data at all is empty, not an error.
-query I
+query T
+SELECT COLUMNS(*)::VARCHAR FROM (
 SELECT count(*) FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1d',
-                                     since := TIMESTAMP '2025-01-01', until := TIMESTAMP '2025-02-01');
+                                     since := TIMESTAMP '2025-01-01', until := TIMESTAMP '2025-02-01')
+);
 ----
 0
 
 # The kraken fixture ignores `since` (always its oldest candles): the cursor still terminates.
-query II
-SELECT count(*), count(DISTINCT ts) FROM ccxt.main.ohlcv('kraken', 'BTC/USD', '1h', since := TIMESTAMP '2024-02-26');
+query TT
+SELECT COLUMNS(*)::VARCHAR FROM (
+SELECT count(*), count(DISTINCT ts) FROM ccxt.main.ohlcv('kraken', 'BTC/USD', '1h', since := TIMESTAMP '2024-02-26')
+);
 ----
 96	96
 
 # Without since: only the latest page.
-query II
-SELECT count(*), max(ts) FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1h');
+query TT
+SELECT COLUMNS(*)::VARCHAR FROM (
+SELECT count(*), max(ts) FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1h')
+);
 ----
 100	2024-02-29 23:00:00
 
-query I
-SELECT count(*) FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1m', since := TIMESTAMP '2024-01-01', max_rows := 250);
+query T
+SELECT COLUMNS(*)::VARCHAR FROM (
+SELECT count(*) FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1m', since := TIMESTAMP '2024-01-01', max_rows := 250)
+);
 ----
 250
 
@@ -101,33 +130,51 @@ SELECT * FROM ccxt.main.ohlcv('binance', 'BTC/USDT', '1h', max_rows := 0);
 
 # Pages hold 40 fills and each minute holds 1-3 fills sharing a timestamp, so pages end
 # mid-millisecond; nothing may be dropped or repeated. 2 hours = 40 x (1+2+3) = 240 fills.
-query III
+query TTT
+SELECT COLUMNS(*)::VARCHAR FROM (
 SELECT count(*), count(DISTINCT trade_id), sum(amount)
-FROM ccxt.main.trades('binance', 'BTC/USDT', since := TIMESTAMP '2024-01-01', until := TIMESTAMP '2024-01-01 02:00:00');
+FROM ccxt.main.trades('binance', 'BTC/USDT', since := TIMESTAMP '2024-01-01', until := TIMESTAMP '2024-01-01 02:00:00')
+);
 ----
 240	240	400.0
 
-query I
-SELECT count(*) FROM ccxt.main.trades('binance', 'BTC/USDT', since := TIMESTAMP '2024-01-01', max_rows := 55);
+# The coinbase fixture, like Coinbase, refuses `since` without an explicit `until` and returns
+# only the newest 50 fills of a window: the worker walks self-sizing time windows instead.
+query TTT
+SELECT COLUMNS(*)::VARCHAR FROM (
+SELECT count(*), count(DISTINCT trade_id), sum(amount)
+FROM ccxt.main.trades('coinbase', 'BTC/USD', since := TIMESTAMP '2024-01-01', until := TIMESTAMP '2024-01-01 03:00:00')
+);
+----
+360	360	600.0
+
+query T
+SELECT COLUMNS(*)::VARCHAR FROM (
+SELECT count(*) FROM ccxt.main.trades('binance', 'BTC/USDT', since := TIMESTAMP '2024-01-01', max_rows := 55)
+);
 ----
 55
 
 # ------------------------------------------------------------------- funding_rates
 
 # 8h settlements in January (31 days x 3), streamed over several pages of 30.
-query II
+query TT
+SELECT COLUMNS(*)::VARCHAR FROM (
 SELECT count(*), sum(CASE WHEN interval_hours = 8 THEN 1 ELSE 0 END)
-FROM ccxt.main.funding_rates('binance', 'BTC/USDT:USDT', start_date := DATE '2024-01-01', end_date := DATE '2024-02-01');
+FROM ccxt.main.funding_rates('binance', 'BTC/USDT:USDT', start_date := DATE '2024-01-01', end_date := DATE '2024-02-01')
+);
 ----
 93	93
 
 # The fixture moves to 4h settlements after 2024-02-01 00:00; sign passes through
 # (positive = longs pay), and annualized = rate x 8760 / interval_hours.
-query TRRR
+query TTTT
+SELECT COLUMNS(*)::VARCHAR FROM (
 SELECT ts::VARCHAR, funding_rate, interval_hours, round(funding_rate_annualized, 6)
 FROM ccxt.main.funding_rates('binance', 'BTC/USDT:USDT',
                              start_date := TIMESTAMP '2024-01-31 16:00:00', end_date := TIMESTAMP '2024-02-01 09:00:00')
-ORDER BY ts;
+ORDER BY ts
+);
 ----
 2024-01-31 16:00:00	-0.0002	8.0	-0.219
 2024-02-01 00:00:00	-0.0001	8.0	-0.1095
@@ -141,15 +188,19 @@ does not support fetchFundingRateHistory
 
 # ------------------------------------------------------------------- ticker (fan-out)
 
-query TRRR
-SELECT exchange, bid, last, ask FROM ccxt.main.ticker('binance', 'BTC/USDT');
+query TTTT
+SELECT COLUMNS(*)::VARCHAR FROM (
+SELECT exchange, bid, last, ask FROM ccxt.main.ticker('binance', 'BTC/USDT')
+);
 ----
 binance	39999.5	40000.0	40000.5
 
 # One row per exchange; a failing venue reports why in `error` instead of failing the query.
 query TTT
+SELECT COLUMNS(*)::VARCHAR FROM (
 SELECT exchange, last IS NULL, error IS NULL
-FROM ccxt.main.ticker(['binance', 'coinbase', 'kraken', 'okx'], 'BTC/USDT') ORDER BY exchange;
+FROM ccxt.main.ticker(['binance', 'coinbase', 'kraken', 'okx'], 'BTC/USDT') ORDER BY exchange
+);
 ----
 binance	false	true
 coinbase	true	false
@@ -157,8 +208,10 @@ kraken	true	false
 okx	false	true
 
 query T
+SELECT COLUMNS(*)::VARCHAR FROM (
 SELECT regexp_extract(error, '(ExchangeNotAvailable|BadSymbol)')
-FROM ccxt.main.ticker(['coinbase', 'kraken'], 'BTC/USDT') ORDER BY exchange;
+FROM ccxt.main.ticker(['coinbase', 'kraken'], 'BTC/USDT') ORDER BY exchange
+);
 ----
 ExchangeNotAvailable
 BadSymbol
@@ -170,33 +223,41 @@ unknown exchange 'mtgox'
 
 # ------------------------------------------------------------------- funding_rate / open_interest
 
-query TRRRT
+query TTTTT
+SELECT COLUMNS(*)::VARCHAR FROM (
 SELECT exchange, funding_rate, interval_hours, round(funding_rate_annualized, 6), error IS NULL
-FROM ccxt.main.funding_rate(['binance', 'okx', 'kraken'], 'BTC/USDT:USDT') ORDER BY exchange;
+FROM ccxt.main.funding_rate(['binance', 'okx', 'kraken'], 'BTC/USDT:USDT') ORDER BY exchange
+);
 ----
 binance	0.0001	8.0	0.1095	true
 kraken	NULL	NULL	NULL	false
 okx	0.0001	8.0	0.1095	true
 
-query TRR
+query TTT
+SELECT COLUMNS(*)::VARCHAR FROM (
 SELECT exchange, open_interest_amount, open_interest_value
-FROM ccxt.main.open_interest(['binance', 'okx'], 'BTC/USDT:USDT') ORDER BY exchange;
+FROM ccxt.main.open_interest(['binance', 'okx'], 'BTC/USDT:USDT') ORDER BY exchange
+);
 ----
 binance	12345.0	493923450.0
 okx	12345.0	494046900.0
 
 # ------------------------------------------------------------------- order_book
 
-query TIRR
-SELECT side, level, price, amount FROM ccxt.main.order_book('kraken', 'BTC/USD', depth := 2) ORDER BY side DESC, level;
+query TTTT
+SELECT COLUMNS(*)::VARCHAR FROM (
+SELECT side, level, price, amount FROM ccxt.main.order_book('kraken', 'BTC/USD', depth := 2) ORDER BY side DESC, level
+);
 ----
 bid	1	40999.5	1.0
 bid	2	40999.0	2.0
 ask	1	41000.5	1.0
 ask	2	41001.0	2.0
 
-query II
-SELECT count(*), count(DISTINCT side) FROM ccxt.main.order_book('kraken', 'BTC/USD');
+query TT
+SELECT COLUMNS(*)::VARCHAR FROM (
+SELECT count(*), count(DISTINCT side) FROM ccxt.main.order_book('kraken', 'BTC/USD')
+);
 ----
 40	2
 
@@ -208,13 +269,17 @@ SELECT * FROM ccxt.main.order_book('kraken', 'BTC/USD', depth := 0);
 # ------------------------------------------------------------------- markets
 
 # 2,503 markets stream as three batches of up to 1,000.
-query II
-SELECT count(*), count(DISTINCT symbol) FROM ccxt.main.markets('binance');
+query TT
+SELECT COLUMNS(*)::VARCHAR FROM (
+SELECT count(*), count(DISTINCT symbol) FROM ccxt.main.markets('binance')
+);
 ----
 2503	2503
 
-query TTTTR
-SELECT symbol, type, settle, linear, contract_size FROM ccxt.main.markets('binance') WHERE contract ORDER BY symbol;
+query TTTTT
+SELECT COLUMNS(*)::VARCHAR FROM (
+SELECT symbol, type, settle, linear, contract_size FROM ccxt.main.markets('binance') WHERE contract ORDER BY symbol
+);
 ----
 BTC/USDT:USDT	swap	USDT	true	1.0
 ETH/USDT:USDT	swap	USDT	true	1.0
@@ -222,8 +287,10 @@ ETH/USDT:USDT	swap	USDT	true	1.0
 # ------------------------------------------------------------------- has / exchanges
 
 query TTT
+SELECT COLUMNS(*)::VARCHAR FROM (
 SELECT method, supported, status FROM ccxt.main.has('kraken')
-WHERE method IN ('fetchOHLCV', 'fetchFundingRateHistory', 'fetchOpenInterest') ORDER BY method;
+WHERE method IN ('fetchOHLCV', 'fetchFundingRateHistory', 'fetchOpenInterest') ORDER BY method
+);
 ----
 fetchFundingRateHistory	false	unsupported
 fetchOHLCV	true	native
@@ -231,9 +298,11 @@ fetchOpenInterest	false	unknown
 
 # CCXT advertises private methods; the worker never exposes them.
 query TT
+SELECT COLUMNS(*)::VARCHAR FROM (
 SELECT method, exposed_by_worker FROM ccxt.main.has('binance')
 WHERE method IN ('createOrder', 'fetchBalance', 'fetchFundingHistory', 'fetchMyTrades', 'fetchTicker', 'withdraw')
-ORDER BY method;
+ORDER BY method
+);
 ----
 createOrder	false
 fetchBalance	false
@@ -243,15 +312,19 @@ fetchTicker	true
 withdraw	false
 
 query TT
+SELECT COLUMNS(*)::VARCHAR FROM (
 SELECT exchange, supported FROM ccxt.main.has(['binance', 'kraken', 'okx'])
-WHERE method = 'fetchFundingRateHistory' ORDER BY exchange;
+WHERE method = 'fetchFundingRateHistory' ORDER BY exchange
+);
 ----
 binance	true
 kraken	false
 okx	true
 
 query TTT
-SELECT id, name, has_funding_rate_history FROM ccxt.main.exchanges ORDER BY id;
+SELECT COLUMNS(*)::VARCHAR FROM (
+SELECT id, name, has_funding_rate_history FROM ccxt.main.exchanges ORDER BY id
+);
 ----
 binance	Binance	true
 coinbase	Coinbase Advanced	false

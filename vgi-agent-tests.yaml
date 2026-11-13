@@ -17,11 +17,10 @@ tasks:
       SELECT count(*) = 7 AND min(close) > 1000
       FROM ccxt.main.ohlcv('coinbase', 'BTC/USD', '1d',
                            since := TIMESTAMP '2025-01-01', until := TIMESTAMP '2025-01-08')
-  - name: okx_funding_january
+  - name: okx_funding_last_month
     check_sql: >-
-      SELECT count(*) >= 90 AND abs(avg(funding_rate_annualized)) < 5
-      FROM ccxt.main.funding_rates('okx', 'BTC/USDT:USDT',
-                                   start_date := DATE '2025-01-01', end_date := DATE '2025-02-01')
+      SELECT count(*) >= 80 AND abs(avg(funding_rate_annualized)) < 5
+      FROM ccxt.main.funding_rates('okx', 'BTC/USDT:USDT', start_date := current_date - INTERVAL 30 DAY)
   - name: btc_spread_kraken_coinbase
     check_sql: >-
       SELECT count(*) = 2 AND bool_and(ask >= bid)

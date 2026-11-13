@@ -90,6 +90,10 @@ class UnsupportedCapabilityError(ValueError):
     """The exchange does not advertise the CCXT capability a function needs."""
 
 
+class UntilRequiredError(ExchangeCallError):
+    """The exchange needs an explicit ``until`` whenever ``since`` is given (Coinbase trades)."""
+
+
 class UnknownExchangeError(ValueError):
     """The exchange id is not one CCXT (or the fixture file) knows."""
 
@@ -192,19 +196,23 @@ class PublicExchange:
 
     # ------------------------------------------------------------- calls
 
-    def call(self, method: str, *args: Any) -> Any:
+    def call(self, method: str, *args: Any, until_ms: int | None = None) -> Any:
         """Call one allowlisted public CCXT method, retrying transient failures.
 
         Args:
             method: A key of ``ALLOWED_METHODS``; anything else is refused.
-            *args: Positional arguments for the CCXT method. No ``params``
-                dict is ever forwarded.
+            *args: Positional arguments for the CCXT method.
+            until_ms: CCXT's unified ``until`` parameter, for exchanges that need
+                an explicit window end. It is the only CCXT ``params`` entry this
+                worker ever sets, always to an integer it computed itself; no
+                caller-supplied ``params`` dict exists.
 
         Returns:
             The CCXT method's return value.
 
         Raises:
             PermissionError: ``method`` is not on the allowlist.
+            UntilRequiredError: the exchange wants ``until_ms`` alongside ``since``.
             ExchangeCallError: the exchange call failed.
 
         """
@@ -213,12 +221,15 @@ class PublicExchange:
             raise PermissionError(f"'{method}' is not a public market-data method this worker may call")
         self.require(capability)
         fn: Callable[..., Any] = getattr(self._exchange, method)
+        kwargs: dict[str, Any] = {} if until_ms is None else {"params": {"until": int(until_ms)}}
         attempt = 1
         while True:
             try:
                 with self._lock:
-                    return fn(*args)
+                    return fn(*args, **kwargs)
             except ccxt.BaseError as err:
+                if isinstance(err, ccxt.ArgumentsRequired) and "until" in str(err):
+                    raise UntilRequiredError(self._describe(capability, err)) from err
                 if not isinstance(err, _RETRYABLE) or _refused(err) or attempt >= MAX_ATTEMPTS:
                     raise ExchangeCallError(self._describe(capability, err)) from err
                 # Offline fixtures have nothing to wait for; real exchanges get backoff.

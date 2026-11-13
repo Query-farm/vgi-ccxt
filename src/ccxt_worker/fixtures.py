@@ -71,7 +71,13 @@ class FakeExchange:
         self.has = spec["has"]
         self.timeframes = {tf: tf for tf in spec.get("timeframes", [])}
         limits = spec.get("limits", {})
-        self.features = {"spot": {"fetchOHLCV": {"limit": limits.get("ohlcv", 100)}}}
+        # CCXT documents per-method page limits under `features`; the worker sizes pages from them.
+        self.features = {
+            "spot": {
+                "fetchOHLCV": {"limit": limits.get("ohlcv", 100)},
+                "fetchTrades": {"limit": limits.get("trades", 100)},
+            }
+        }
         self._limits = limits
         self._series: dict[str, Any] = spec.get("series", {})
 
@@ -161,17 +167,32 @@ class FakeExchange:
 
     # -------------------------------------------------------------- trades
 
-    def fetch_trades(self, symbol: str, since: int | None = None, limit: int | None = None) -> list[dict[str, Any]]:
-        """Trades every minute, 1-3 fills sharing each minute's timestamp, oldest first."""
+    def fetch_trades(
+        self,
+        symbol: str,
+        since: int | None = None,
+        limit: int | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Trades every minute, 1-3 fills sharing each minute's timestamp, oldest first.
+
+        With ``trades_require_until`` (as Coinbase), ``since`` needs ``params['until']``
+        and the newest ``limit`` fills of ``[since, until]`` come back.
+        """
         self._fail("fetchTrades")
+        until = (params or {}).get("until")
+        if self._spec.get("trades_require_until") and since is not None and until is None:
+            raise self._errors.ArgumentsRequired(
+                f"{self.id} fetchTrades() requires a `until` parameter when you use `since` argument"
+            )
         series = self._series_for(symbol)
         start = iso_ms(series["start"])
         minutes = max(0, (self._end(series) - start) // 60_000)
+        if until is not None:
+            minutes = min(minutes, (int(until) - start) // 60_000 + 1)
         count = self._page("trades", limit)
+        first_minute = max(0, minutes - count) if since is None else max(0, -(-(since - start) // 60_000))
         everything: list[dict[str, Any]] = []
-        first_minute = 0 if since is None else max(0, -(-(since - start) // 60_000))
-        if since is None:
-            first_minute = max(0, minutes - count)
         price = float(series["price"])
         for m in range(first_minute, minutes):
             ts = start + m * 60_000
@@ -189,9 +210,11 @@ class FakeExchange:
                         "cost": (price + m % 20) * (1.0 + j),
                     }
                 )
-            if since is not None and len(everything) >= count:
+            if since is not None and until is None and len(everything) >= count:
                 break
-        return everything[:count] if since is not None else everything[-count:]
+        if since is not None and until is None:
+            return everything[:count]
+        return everything[-count:]
 
     # -------------------------------------------------------------- snapshots
 

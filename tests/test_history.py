@@ -111,6 +111,14 @@ def test_ohlcv_rejects_an_inverted_window(client: Client) -> None:
         scan(client, "ohlcv", "binance", "BTC/USDT", "1h", since=ts(JAN1), until=ts(JAN1 - HOUR))
 
 
+def test_a_start_after_now_is_empty_not_an_error(client: Client) -> None:
+    # The fixture clock is 2026-01-01; with no `until`, a later start has nothing yet.
+    table = scan(client, "ohlcv", "binance", "BTC/USDT", "1h", since=ts(dt.datetime(2026, 6, 1)))
+    assert table.num_rows == 0
+    table = scan(client, "funding_rates", "okx", "BTC/USDT:USDT", start_date=ts(dt.datetime(2026, 6, 1)))
+    assert table.num_rows == 0
+
+
 def test_ohlcv_unknown_symbol_names_the_exchange(client: Client) -> None:
     with pytest.raises(Exception, match="binance fetchOHLCV failed: BadSymbol"):
         scan(client, "ohlcv", "binance", "DOGE/EUR", "1h", since=ts(JAN1))
@@ -129,6 +137,7 @@ class Collector:
 
     def __init__(self) -> None:
         self.batches: list[pa.RecordBatch] = []
+        self.logs: list[str] = []
         self.finished = False
 
     def emit(self, batch: pa.RecordBatch) -> None:
@@ -136,6 +145,9 @@ class Collector:
 
     def finish(self) -> None:
         self.finished = True
+
+    def client_log(self, level: Any, message: str, **extra: str) -> None:
+        self.logs.append(message)
 
 
 def _drive(fn: Any, args: Any, schema: pa.Schema, cursor_type: Any) -> tuple[list[pa.RecordBatch], int]:
@@ -196,6 +208,24 @@ def test_trades_never_drop_or_repeat_fills_sharing_a_millisecond(client: Client)
     assert len(ids) == len(set(ids))
 
 
+def test_trades_on_an_exchange_that_needs_until_page_by_window(client: Client) -> None:
+    # The coinbase fixture refuses `since` without `until` (as Coinbase does) and returns the
+    # newest 50 fills of a window; the worker falls back to explicit, self-sizing windows.
+    table = scan(client, "trades", "coinbase", "BTC/USD", since=ts(JAN1), until=ts(JAN1 + 3 * HOUR))
+    ids: list[Any] = table.column("trade_id").to_pylist()
+    expected = [f"{m}-{j}" for m in range(180) for j in range(m % 3 + 1)]
+    assert sorted(ids) == sorted(expected)
+    assert len(ids) == len(set(ids)) == 360
+
+
+def test_windowed_trades_cursor_survives_serialization() -> None:
+    args = TradesArgs(exchange="coinbase", symbol="BTC/USD", since=T0, until=T0 + 2 * HOUR)
+    batches, _ = _drive(Trades, args, Trades.FIXED_SCHEMA, TradesCursor)
+    ids = [i for b in batches for i in b.column("trade_id").to_pylist()]
+    assert len(batches) > 1
+    assert len(ids) == len(set(ids)) == 240
+
+
 def test_trades_without_since_returns_recent_page(client: Client) -> None:
     table = scan(client, "trades", "binance", "BTC/USDT")
     assert 0 < table.num_rows <= 40
@@ -251,3 +281,20 @@ def test_funding_rates_lone_settlement_uses_the_declared_interval(client: Client
         end_date=ts(dt.datetime(2024, 2, 29, 1)),
     )
     assert table.to_pylist()[0]["interval_hours"] == 8.0
+
+
+def test_a_late_starting_history_is_reported_not_silent() -> None:
+    # The kraken fixture ignores `since` and starts its candles on 2024-02-25.
+    args = OhlcvArgs(exchange="kraken", symbol="BTC/USD", timeframe="1h", since=cast(Any, dt.datetime(2024, 1, 1)))
+    params = cast(Any, SimpleNamespace(args=args, output_schema=OHLCV_SCHEMA))
+    out = Collector()
+    Ohlcv.process(params, Ohlcv.initial_state(params), cast(Any, out))
+    assert out.logs and "kraken returned candles starting 2024-02-25 00:00 UTC" in out.logs[0]
+
+
+def test_an_on_time_history_logs_nothing() -> None:
+    args = OhlcvArgs(exchange="binance", symbol="BTC/USDT", timeframe="1h", since=T0)
+    params = cast(Any, SimpleNamespace(args=args, output_schema=OHLCV_SCHEMA))
+    out = Collector()
+    Ohlcv.process(params, Ohlcv.initial_state(params), cast(Any, out))
+    assert out.logs == []
