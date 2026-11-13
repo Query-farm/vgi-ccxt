@@ -191,7 +191,7 @@ CATALOG_TAGS = {
     "vgi.doc_llm": CATALOG_DOC_LLM,
     "vgi.doc_md": CATALOG_DOC_MD,
     "vgi.source_url": SOURCE_URL,
-    "vgi.icon_url": "https://query.farm/media-kit/products/vgi/vgi-logo.png",
+    "vgi.icon_url": "https://query.farm/media-kit/logo/mark-512.png",
     "vgi.license": "MIT",
     "vgi.author": "Query.Farm",
     "vgi.copyright": "Copyright 2026 Query Farm LLC - https://query.farm",
