@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.0 (2026-11-13)
 
 First release of the CCXT worker: public crypto-exchange market data as DuckDB
 table functions.
