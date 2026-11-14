@@ -43,3 +43,28 @@ tasks:
     check_sql: >-
       SELECT count(*) = 1 FROM ccxt.main.open_interest('okx', 'BTC/USDT:USDT')
       WHERE error IS NULL AND coalesce(open_interest_amount, open_interest_value) > 0
+  # Composed (funding_rates + ohlcv) over a fixed past window on Hyperliquid, which keeps long
+  # history. The agent saves its answer in a temp table; check_sql recomputes the truth from the
+  # live API and compares within a float tolerance, so a wrong or partial answer fails.
+  - name: hyperliquid_daily_funding_vs_close
+    check_sql: >-
+      WITH funding AS (
+        SELECT CAST(ts AS DATE) AS day, sum(funding_rate) AS daily_funding
+        FROM ccxt.main.funding_rates('hyperliquid', 'BTC/USDC:USDC',
+                                     start_date := DATE '2025-06-01', end_date := DATE '2025-06-08')
+        GROUP BY day
+      ), candles AS (
+        SELECT CAST(ts AS DATE) AS day, close
+        FROM ccxt.main.ohlcv('hyperliquid', 'BTC/USDC:USDC', '1d',
+                             since := TIMESTAMP '2025-06-01', until := TIMESTAMP '2025-06-08')
+      ), truth AS (SELECT day, daily_funding, close FROM funding JOIN candles USING (day))
+      SELECT (SELECT count(*) FROM truth) = 7
+      AND (SELECT count(*) FROM btc_funding_vs_close) = 7
+      AND NOT EXISTS (
+        SELECT 1 FROM truth t
+        LEFT JOIN btc_funding_vs_close a
+          ON CAST(a.day AS DATE) = t.day
+          AND abs(a.daily_funding - t.daily_funding) < 1e-9
+          AND abs(a.close - t.close) < 1e-6
+        WHERE a.day IS NULL
+      )

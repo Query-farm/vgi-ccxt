@@ -45,6 +45,7 @@ from .common import (
     time_arg_ms,
     us,
 )
+from .composed import FUNDING_VS_PRICE
 from .meta import TERMS_NOTE, column, object_tags, result_columns
 
 LOG = logging.getLogger(__name__)
@@ -709,6 +710,7 @@ class FundingRates(TableFunctionGenerator[FundingRatesArgs, FundingCursor]):
                 ),
                 description="Daily total ETH perpetual funding on Binance over the first two weeks of 2025",
             ),
+            FUNDING_VS_PRICE,
         ]
 
     @classmethod

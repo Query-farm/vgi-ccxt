@@ -84,6 +84,13 @@ SELECT ts, funding_rate, interval_hours, funding_rate_annualized
 FROM ccxt.main.funding_rates('okx', 'BTC/USDT:USDT', start_date := current_date - INTERVAL 30 DAY)
 ORDER BY ts;
 
+-- Combine functions: current funding weighted by each venue's open interest.
+SELECT sum(f.funding_rate_annualized * o.open_interest_value) / sum(o.open_interest_value) AS oi_weighted_apr,
+       sum(o.open_interest_value) AS total_oi_usdt
+FROM ccxt.main.funding_rate(['binance', 'okx'], 'BTC/USDT:USDT') AS f
+JOIN ccxt.main.open_interest(['binance', 'okx'], 'BTC/USDT:USDT') AS o USING (exchange)
+WHERE f.error IS NULL AND o.error IS NULL;
+
 -- Which exchanges can answer a derivatives question?
 SELECT id, name FROM ccxt.main.exchanges
 WHERE has_funding_rate_history AND has_open_interest ORDER BY id;

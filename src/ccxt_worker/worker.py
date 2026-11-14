@@ -24,6 +24,7 @@ from vgi import Worker
 from vgi.catalog import Catalog, Schema, Table
 from vgi.catalog.constraints import constraint_record
 
+from .composed import COMPOSED_EXAMPLES
 from .history import FundingRates, Ohlcv, Trades
 from .meta import (
     CATALOG_DOC_MD,
@@ -73,7 +74,7 @@ _ALL_EXAMPLES = _stamp_example_queries([*FUNCTIONS, Exchanges])
 
 
 def _schema_examples() -> list[dict[str, str]]:
-    """One example per object for the schema-level list, which agent tools cap at 4,000 characters."""
+    """One example per object, then the composed examples, for the schema-level list (8,000 characters max)."""
     seen: set[str] = set()
     picked: list[dict[str, str]] = []
     objects: list[type[Any]] = [*FUNCTIONS, Exchanges]
@@ -82,6 +83,7 @@ def _schema_examples() -> list[dict[str, str]]:
             seen.add(fn.Meta.name)
             ex = fn.Meta.examples[0]
             picked.append({"description": ex.description, "sql": ex.sql})
+    picked.extend({"description": ex.description, "sql": ex.sql} for ex in COMPOSED_EXAMPLES)
     return picked
 
 

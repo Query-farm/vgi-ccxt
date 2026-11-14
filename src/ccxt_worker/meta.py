@@ -183,6 +183,14 @@ AGENT_TEST_TASKS = [
         "name": "okx_open_interest",
         "prompt": "Using the ccxt worker, what is the open interest of OKX's BTC/USDT:USDT perpetual?",
     },
+    {
+        "name": "hyperliquid_daily_funding_vs_close",
+        "prompt": "Using the ccxt worker, for Hyperliquid's BTC/USDC:USDC perpetual, give for each UTC day from "
+        "2025-06-01 through 2025-06-07 the sum of the funding rates settled that day (grouped by the UTC date "
+        "of the settlement timestamp) and that day's close from the perpetual's daily candles. Save the answer "
+        "as a temp table named btc_funding_vs_close with columns day (DATE), daily_funding (DOUBLE) and "
+        "close (DOUBLE).",
+    },
 ]
 
 CATALOG_TAGS = {

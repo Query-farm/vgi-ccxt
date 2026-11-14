@@ -1,7 +1,7 @@
 # name: test/sql/ccxt.test
 # description: SQL-level tests for the ccxt worker, run through DuckDB by ci/run-integration.sh.
 #              Every exchange is the offline fixture stand-in (test/fixtures/exchanges.json),
-#              whose clock is fixed at 2024-03-01 00:00 UTC.
+#              whose clock is fixed at 2026-01-01 00:00 UTC.
 # group: [ccxt]
 
 require vgi
@@ -330,3 +330,43 @@ binance	Binance	true
 coinbase	Coinbase Advanced	false
 kraken	Kraken	false
 okx	OKX	true
+
+# ------------------------------------------------------------------- composed examples
+# The queries published in src/ccxt_worker/composed.py, checked against the fixtures.
+
+# funding_rate x open_interest: OI-weighted annualized funding across two venues.
+query TTT
+SELECT COLUMNS(*)::VARCHAR FROM (
+SELECT round(sum(f.funding_rate_annualized * o.open_interest_value) / sum(o.open_interest_value), 6),
+       sum(o.open_interest_value), count(*)
+FROM ccxt.main.funding_rate(['binance', 'okx'], 'BTC/USDT:USDT') AS f
+JOIN ccxt.main.open_interest(['binance', 'okx'], 'BTC/USDT:USDT') AS o USING (exchange)
+WHERE f.error IS NULL AND o.error IS NULL
+);
+----
+0.1095	987970350.0	2
+
+# order_book x markets: walking the asks for 2 BTC (1 @ 41000.5 + 1 @ 41001), plus the 0.2% taker fee.
+query TTT
+SELECT COLUMNS(*)::VARCHAR FROM (
+WITH asks AS (SELECT price, amount, sum(amount) OVER (ORDER BY level) - amount AS ahead
+FROM ccxt.main.order_book('kraken', 'BTC/USD', depth := 50) WHERE side = 'ask'),
+fill AS (SELECT sum(least(amount, greatest(2 - ahead, 0))) AS filled_btc,
+sum(price * least(amount, greatest(2 - ahead, 0))) AS cost_usd FROM asks)
+SELECT fill.filled_btc, fill.cost_usd / fill.filled_btc, round(fill.cost_usd * (1 + m.taker), 6)
+FROM fill JOIN ccxt.main.markets('kraken') AS m ON m.symbol = 'BTC/USD'
+);
+----
+2.0	41000.75	82165.503
+
+# funding_rates x ohlcv: one row per day where both have data, funding summed per settlement date.
+query TTT
+SELECT COLUMNS(*)::VARCHAR FROM (
+WITH funding AS (SELECT CAST(ts AS DATE) AS day, sum(funding_rate) AS daily_funding
+FROM ccxt.main.funding_rates('binance', 'BTC/USDT:USDT', start_date := DATE '2025-01-01', end_date := DATE '2025-01-08') GROUP BY day),
+candles AS (SELECT CAST(ts AS DATE) AS day, close / open - 1 AS price_return
+FROM ccxt.main.ohlcv('binance', 'BTC/USDT:USDT', '1d', since := TIMESTAMP '2025-01-01', until := TIMESTAMP '2025-01-08'))
+SELECT count(*), round(sum(abs(daily_funding)), 6), min(day) FROM funding JOIN candles USING (day)
+);
+----
+7	0.0036	2025-01-01

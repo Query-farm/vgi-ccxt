@@ -39,6 +39,7 @@ from .common import (
     num,
     us,
 )
+from .composed import FUNDING_OI_WEIGHTED, ORDER_BOOK_FILL_COST
 from .history import signed_rate
 from .meta import TERMS_NOTE, column, object_tags, result_columns
 
@@ -300,6 +301,7 @@ class FundingRate(TableFunctionGenerator[FanoutArgs, FanoutCursor]):
                 ),
                 description="The next ETH perpetual funding settlement on OKX",
             ),
+            FUNDING_OI_WEIGHTED,
         ]
 
     @classmethod
@@ -490,6 +492,7 @@ class OrderBook(TableFunctionGenerator[OrderBookArgs, OnceCursor]):
                 ),
                 description="Best bid and ask for ETH/USD on Coinbase",
             ),
+            ORDER_BOOK_FILL_COST,
         ]
 
     @classmethod
