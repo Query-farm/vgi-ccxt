@@ -210,3 +210,7 @@ Copyright 2026 Query Farm LLC - https://query.farm
 The market data this worker returns belongs to the exchanges, is not covered by that
 license, and is subject to each exchange's terms. This project is not affiliated with or
 endorsed by CCXT or any exchange. See [NOTICE](NOTICE).
+
+## Executed notebook
+
+[Funding rates need settlement intervals](notebooks/README.md) uses explicit synthetic fixtures to compare inferred intervals with a fixed annualization assumption.

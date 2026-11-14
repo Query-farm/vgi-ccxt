@@ -1,0 +1,297 @@
+{
+  "_comment": "Offline stand-in exchanges for tests and the metadata check (see src/ccxt_worker/fixtures.py). Values are generated from row indexes so tests can assert exact numbers. Series with an 'end' stop there; the rest run to the fixture clock 'now'.",
+  "now": "2026-01-01T00:00:00Z",
+  "exchanges": {
+    "binance": {
+      "name": "Binance",
+      "countries": [
+        "JP",
+        "MT"
+      ],
+      "certified": true,
+      "pro": true,
+      "rateLimit": 50,
+      "www": "https://www.binance.com",
+      "timeframes": [
+        "1m",
+        "1h",
+        "4h",
+        "1d"
+      ],
+      "has": {
+        "spot": true,
+        "swap": true,
+        "fetchMarkets": true,
+        "fetchOHLCV": true,
+        "fetchTicker": true,
+        "fetchOrderBook": true,
+        "fetchTrades": true,
+        "fetchFundingRate": true,
+        "fetchFundingRateHistory": true,
+        "fetchOpenInterest": true,
+        "fetchBalance": true,
+        "createOrder": true,
+        "fetchMyTrades": true,
+        "fetchFundingHistory": true,
+        "withdraw": true
+      },
+      "limits": {
+        "ohlcv": 100,
+        "trades": 40,
+        "funding": 30
+      },
+      "markets": [
+        {
+          "symbol": "BTC/USDT",
+          "base": "BTC",
+          "quote": "USDT",
+          "type": "spot"
+        },
+        {
+          "symbol": "BTC/USDT:USDT",
+          "base": "BTC",
+          "quote": "USDT",
+          "settle": "USDT",
+          "type": "swap",
+          "linear": true,
+          "inverse": false,
+          "contractSize": 1.0
+        },
+        {
+          "symbol": "ETH/USDT:USDT",
+          "base": "ETH",
+          "quote": "USDT",
+          "settle": "USDT",
+          "type": "swap",
+          "linear": true,
+          "inverse": false,
+          "contractSize": 1.0
+        }
+      ],
+      "generate_markets": 2500,
+      "series": {
+        "BTC/USDT": {
+          "price": 40000,
+          "start": "2024-01-01T00:00:00Z",
+          "end": "2024-03-01T00:00:00Z"
+        },
+        "BTC/USDT:USDT": {
+          "price": 40010,
+          "start": "2024-01-01T00:00:00Z",
+          "funding_hours": 8,
+          "funding_change": {
+            "at": "2024-02-01T00:00:00Z",
+            "hours": 4
+          }
+        },
+        "ETH/USDT:USDT": {
+          "price": 2500,
+          "start": "2025-01-01T00:00:00Z",
+          "funding_hours": 8
+        }
+      }
+    },
+    "kraken": {
+      "name": "Kraken",
+      "countries": [
+        "US"
+      ],
+      "certified": false,
+      "pro": true,
+      "rateLimit": 1000,
+      "www": "https://www.kraken.com",
+      "timeframes": [
+        "1m",
+        "1h",
+        "1d"
+      ],
+      "has": {
+        "spot": true,
+        "swap": false,
+        "fetchMarkets": true,
+        "fetchOHLCV": true,
+        "fetchTicker": true,
+        "fetchOrderBook": true,
+        "fetchTrades": true,
+        "fetchFundingRate": false,
+        "fetchFundingRateHistory": false,
+        "fetchOpenInterest": null,
+        "fetchBalance": true,
+        "createOrder": true
+      },
+      "limits": {
+        "ohlcv": 720,
+        "trades": 1000
+      },
+      "ohlcv_ignores_since": true,
+      "markets": [
+        {
+          "symbol": "BTC/USD",
+          "base": "BTC",
+          "quote": "USD",
+          "type": "spot"
+        },
+        {
+          "symbol": "ETH/USD",
+          "base": "ETH",
+          "quote": "USD",
+          "type": "spot"
+        }
+      ],
+      "series": {
+        "BTC/USD": {
+          "price": 41000,
+          "start": "2024-02-25T00:00:00Z",
+          "end": "2024-03-01T00:00:00Z"
+        },
+        "ETH/USD": {
+          "price": 2500,
+          "start": "2024-02-25T00:00:00Z",
+          "end": "2024-03-01T00:00:00Z"
+        }
+      }
+    },
+    "coinbase": {
+      "name": "Coinbase Advanced",
+      "countries": [
+        "US"
+      ],
+      "certified": true,
+      "pro": true,
+      "rateLimit": 34,
+      "www": "https://www.coinbase.com",
+      "timeframes": [
+        "1m",
+        "1h",
+        "1d"
+      ],
+      "has": {
+        "spot": true,
+        "fetchMarkets": true,
+        "fetchOHLCV": true,
+        "fetchTicker": true,
+        "fetchOrderBook": true,
+        "fetchTrades": true,
+        "fetchFundingRate": false,
+        "fetchFundingRateHistory": false,
+        "fetchOpenInterest": false
+      },
+      "limits": {
+        "ohlcv": 300,
+        "trades": 50
+      },
+      "errors": {
+        "fetchTicker": {
+          "class": "ExchangeNotAvailable",
+          "message": "GET https://api.coinbase.com 503 Service Unavailable"
+        }
+      },
+      "markets": [
+        {
+          "symbol": "BTC/USD",
+          "base": "BTC",
+          "quote": "USD",
+          "type": "spot"
+        },
+        {
+          "symbol": "ETH/USD",
+          "base": "ETH",
+          "quote": "USD",
+          "type": "spot"
+        }
+      ],
+      "series": {
+        "BTC/USD": {
+          "price": 40990,
+          "start": "2024-01-01T00:00:00Z"
+        },
+        "ETH/USD": {
+          "price": 3290,
+          "start": "2025-01-01T00:00:00Z"
+        }
+      },
+      "trades_require_until": true
+    },
+    "okx": {
+      "name": "OKX",
+      "countries": [
+        "CN",
+        "US"
+      ],
+      "certified": true,
+      "pro": true,
+      "rateLimit": 110,
+      "www": "https://www.okx.com",
+      "timeframes": [
+        "1m",
+        "1h",
+        "1d"
+      ],
+      "has": {
+        "spot": true,
+        "swap": true,
+        "fetchMarkets": true,
+        "fetchOHLCV": true,
+        "fetchTicker": true,
+        "fetchOrderBook": true,
+        "fetchTrades": true,
+        "fetchFundingRate": true,
+        "fetchFundingRateHistory": true,
+        "fetchOpenInterest": true
+      },
+      "limits": {
+        "ohlcv": 100,
+        "funding": 100
+      },
+      "markets": [
+        {
+          "symbol": "BTC/USDT:USDT",
+          "base": "BTC",
+          "quote": "USDT",
+          "settle": "USDT",
+          "type": "swap",
+          "linear": true,
+          "inverse": false,
+          "contractSize": 0.01
+        },
+        {
+          "symbol": "ETH/USDT",
+          "base": "ETH",
+          "quote": "USDT",
+          "type": "spot"
+        },
+        {
+          "symbol": "ETH/USDT:USDT",
+          "base": "ETH",
+          "quote": "USDT",
+          "settle": "USDT",
+          "type": "swap",
+          "linear": true,
+          "inverse": false,
+          "contractSize": 0.1
+        }
+      ],
+      "series": {
+        "BTC/USDT": {
+          "price": 40005,
+          "start": "2024-01-01T00:00:00Z",
+          "end": "2024-03-01T00:00:00Z"
+        },
+        "BTC/USDT:USDT": {
+          "price": 40020,
+          "start": "2024-02-29T00:00:00Z",
+          "funding_hours": 8
+        },
+        "ETH/USDT": {
+          "price": 3300,
+          "start": "2025-01-01T00:00:00Z"
+        },
+        "ETH/USDT:USDT": {
+          "price": 3301,
+          "start": "2025-01-01T00:00:00Z",
+          "funding_hours": 8
+        }
+      }
+    }
+  }
+}
