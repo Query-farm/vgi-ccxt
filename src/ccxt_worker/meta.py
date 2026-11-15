@@ -113,6 +113,12 @@ CATALOG_DOC_LLM = (
     "are UTC. Exchanges differ in what they support, so check capabilities before relying on one."
 )
 
+CATALOG_SOURCES_MD = (
+    "\n\n## Sources and references\n\n"
+    "- [CCXT on GitHub](https://github.com/ccxt/ccxt)\n"
+    "- [CCXT documentation (unified API, exchange ids)](https://docs.ccxt.com/)\n"
+    "- [ccxt on PyPI](https://pypi.org/project/ccxt/)"
+)
 CATALOG_DOC_MD = (
     "# Crypto exchange market data\n\n"
     "Unified public market data from more than one hundred centralized crypto exchanges, served "
@@ -120,9 +126,10 @@ CATALOG_DOC_MD = (
     "quotes, order books, trades, listed markets, and perpetual-swap funding and open interest.\n\n"
     "Exchanges are named by CCXT id and markets by CCXT's unified symbol (`BTC/USD` for spot, "
     "`BTC/USDT:USDT` for a USDT-settled perpetual). No credentials are used or accepted.\n\n"
-    "**Terms of use.** " + TERMS_NOTE
+    "**Terms of use.** " + TERMS_NOTE + CATALOG_SOURCES_MD
 )
 
+SCHEMA_COMMENT = "Public crypto market data from CCXT exchanges: history, snapshots, derivatives and reference tables."
 SCHEMA_DOC_LLM = (
     "Table functions over CCXT's public market-data API. History functions page through a time "
     "window with a since-cursor and accept `TIMESTAMP`, `DATE` or ISO-8601 string bounds; snapshot functions "

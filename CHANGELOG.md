@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2 (unreleased)
+
+- Docs link to the CCXT library: the catalog documentation now ends with a
+  "Sources and references" section linking the CCXT project, its
+  documentation and its PyPI package (VGI183).
+- The `main` schema comment is now a short one-line summary, so the schema's
+  `vgi.doc_md` adds detail instead of repeating it (VGI102).
+
 ## 0.1.1 (2026-11-14)
 
 - The catalog comment is now one plain-text sentence saying what the worker covers (rule

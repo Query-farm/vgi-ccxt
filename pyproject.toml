@@ -1,6 +1,6 @@
 [project]
 name = "vgi-ccxt-worker"
-version = "0.1.1"
+version = "0.1.2"
 description = "Crypto exchange market data (candles, quotes, order books, trades, perpetual funding) for DuckDB via CCXT"
 readme = "README.md"
 license = "MIT"
