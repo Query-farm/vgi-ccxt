@@ -1,0 +1,47 @@
+{
+  "query": "SELECT * FROM duckdb_databases() WHERE database_name='ccxt'",
+  "columns": [
+    "database_name",
+    "database_oid",
+    "path",
+    "comment",
+    "tags",
+    "internal",
+    "type",
+    "readonly",
+    "encrypted",
+    "cipher",
+    "options"
+  ],
+  "rows": [
+    [
+      "ccxt",
+      22595,
+      null,
+      "# Crypto exchange market data\n\nUnified public market data from more than one hundred centralized crypto exchanges, served to DuckDB through the MIT-licensed [CCXT](https://github.com/ccxt/ccxt) library: candles, quotes, order books, trades, listed markets, and perpetual-swap funding and open interest.\n\nExchanges are named by CCXT id and markets by CCXT's unified symbol (`BTC/USD` for spot, `BTC/USDT:USDT` for a USDT-settled perpetual). No credentials are used or accepted.\n\n**Terms of use.** Every call is a live request from your machine to the exchange's public API. Nothing is cached or redistributed by this worker; you are the API caller, and each exchange's terms of use and geographic restrictions apply to you (for example, Binance.com refuses US IP addresses).",
+      {
+        "vgi.agent_test_tasks": "[{\"name\": \"kraken_supports_ohlcv\", \"prompt\": \"Using the ccxt worker, does the Kraken exchange support fetching OHLCV candles?\"}, {\"name\": \"exchanges_with_funding_history\", \"prompt\": \"Using the ccxt worker, how many exchanges support fetching funding rate history?\"}, {\"name\": \"btc_daily_closes\", \"prompt\": \"Using the ccxt worker, list Coinbase's daily BTC/USD closing prices for the first week of January 2025, oldest first.\"}, {\"name\": \"okx_funding_last_month\", \"prompt\": \"Using the ccxt worker, what was the average annualized funding rate of the BTC/USDT:USDT perpetual on OKX over the last 30 days?\"}, {\"name\": \"btc_spread_kraken_coinbase\", \"prompt\": \"Using the ccxt worker, what is the current bid-ask spread of BTC/USD on Kraken and on Coinbase?\"}, {\"name\": \"kraken_recent_trade_count\", \"prompt\": \"Using the ccxt worker, how many trades are in Kraken's most recent page of BTC/USD trades?\"}, {\"name\": \"kraken_book_liquidity\", \"prompt\": \"Using the ccxt worker, how much BTC is resting in the top 10 bid levels of Kraken's BTC/USD book?\"}, {\"name\": \"okx_btc_perpetuals\", \"prompt\": \"Using the ccxt worker, which BTC perpetual swaps does OKX list?\"}, {\"name\": \"okx_current_funding\", \"prompt\": \"Using the ccxt worker, what is the annualized funding rate of OKX's BTC/USDT:USDT perpetual right now?\"}, {\"name\": \"okx_open_interest\", \"prompt\": \"Using the ccxt worker, what is the open interest of OKX's BTC/USDT:USDT perpetual?\"}]",
+        "vgi.author": "Query.Farm",
+        "vgi.copyright": "Copyright 2026 Query Farm LLC - https://query.farm",
+        "vgi.doc_llm": "Public cryptocurrency market data from more than one hundred centralized exchanges, through the CCXT library's unified API. Exchanges are named by their CCXT id (for example 'kraken', 'coinbase', 'okx', 'binance', 'bybit') and markets by CCXT's unified symbol: 'BASE/QUOTE' for spot (such as 'BTC/USD') and 'BASE/QUOTE:SETTLE' for perpetual swaps (such as 'BTC/USDT:USDT'). Use it for candle backfills, cross-exchange price comparison, order-book depth, recent trades, and perpetual funding and open interest. No API key is needed: only public endpoints are reachable, and every query is a live request to the exchange. Timestamps are UTC. Exchanges differ in what they support, so check capabilities before relying on one.",
+        "vgi.doc_md": "# Crypto exchange market data\n\nUnified public market data from more than one hundred centralized crypto exchanges, served to DuckDB through the MIT-licensed [CCXT](https://github.com/ccxt/ccxt) library: candles, quotes, order books, trades, listed markets, and perpetual-swap funding and open interest.\n\nExchanges are named by CCXT id and markets by CCXT's unified symbol (`BTC/USD` for spot, `BTC/USDT:USDT` for a USDT-settled perpetual). No credentials are used or accepted.\n\n**Terms of use.** Every call is a live request from your machine to the exchange's public API. Nothing is cached or redistributed by this worker; you are the API caller, and each exchange's terms of use and geographic restrictions apply to you (for example, Binance.com refuses US IP addresses).",
+        "vgi.icon_url": "https://query.farm/media-kit/logo/mark-512.png",
+        "vgi.keywords": "[\"crypto\", \"cryptocurrency\", \"bitcoin\", \"ccxt\", \"exchange\", \"market data\", \"ohlcv\", \"candles\", \"order book\", \"funding rate\", \"perpetual swap\", \"open interest\"]",
+        "vgi.license": "MIT",
+        "vgi.source_url": "https://github.com/Query-farm/vgi-ccxt",
+        "vgi.subtitle": "Candles, quotes, order books, trades and perpetual funding from 100+ crypto exchanges.",
+        "vgi.support_contact": "https://github.com/Query-farm/vgi-ccxt/issues",
+        "vgi.support_policy_url": "https://github.com/Query-farm/vgi-ccxt#support",
+        "vgi.title": "Crypto Market Data"
+      },
+      false,
+      "vgi",
+      false,
+      false,
+      null,
+      {
+        "location": "uvx --from git+https://github.com/Query-farm/vgi-ccxt@v0.1.0 vgi-ccxt-worker"
+      }
+    ]
+  ]
+}

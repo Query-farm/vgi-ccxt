@@ -1,0 +1,407 @@
+{
+  "query": "SELECT * FROM duckdb_functions() WHERE database_name='ccxt'",
+  "columns": [
+    "database_name",
+    "database_oid",
+    "schema_name",
+    "function_name",
+    "alias_of",
+    "function_type",
+    "description",
+    "comment",
+    "tags",
+    "return_type",
+    "parameters",
+    "parameter_types",
+    "varargs",
+    "macro_definition",
+    "has_side_effects",
+    "internal",
+    "extension_name",
+    "function_oid",
+    "examples",
+    "stability",
+    "categories"
+  ],
+  "rows": [
+    [
+      "ccxt",
+      "22595",
+      "main",
+      "open_interest",
+      null,
+      "table",
+      "Current open interest of a perpetual or futures market, across one or more exchanges",
+      null,
+      {
+        "vgi.category": "derivatives",
+        "vgi.doc_llm": "Current open interest of a derivatives market: the amount (contracts or base currency, as the exchange reports it) and, where published, its value in the quote currency. First argument: one exchange id or a list; second: the unified symbol ('BTC/USDT:USDT'). Exchanges report different units and some publish only one of the two columns, so compare `open_interest_value` across venues. Unsupported exchanges return a row with `error` set.",
+        "vgi.doc_md": "## open_interest(exchange | [exchange, ...], symbol)\n\nOpen interest per exchange, in contracts/base and in quote value.\n\nEvery call is a live request from your machine to the exchange's public API. Nothing is cached or redistributed by this worker; you are the API caller, and each exchange's terms of use and geographic restrictions apply to you (for example, Binance.com refuses US IP addresses).",
+        "vgi.example_queries": "[{\"description\": \"BTC perpetual open interest by venue, largest first\", \"sql\": \"SELECT exchange, open_interest_value FROM ccxt.main.open_interest(['binance', 'okx'], 'BTC/USDT:USDT') WHERE error IS NULL ORDER BY open_interest_value DESC\"}, {\"description\": \"ETH perpetual open interest on OKX\", \"sql\": \"SELECT open_interest_amount FROM ccxt.main.open_interest('okx', 'ETH/USDT:USDT')\"}]",
+        "vgi.keywords": "[\"open interest\", \"oi\", \"outstanding contracts\", \"perpetual swap\", \"futures\", \"positioning\"]",
+        "vgi.result_columns_schema": "[{\"name\": \"exchange\", \"type\": \"VARCHAR\", \"description\": \"CCXT exchange id.\"}, {\"name\": \"symbol\", \"type\": \"VARCHAR\", \"description\": \"CCXT unified derivatives symbol.\"}, {\"name\": \"ts\", \"type\": \"TIMESTAMP\", \"description\": \"When the exchange measured open interest, UTC.\"}, {\"name\": \"open_interest_amount\", \"type\": \"DOUBLE\", \"description\": \"Open interest in contracts or base currency, as the exchange reports it.\"}, {\"name\": \"open_interest_value\", \"type\": \"DOUBLE\", \"description\": \"Open interest in the quote or settlement currency.\"}, {\"name\": \"error\", \"type\": \"VARCHAR\", \"description\": \"NULL on success; otherwise why this exchange returned no data (the other columns are then NULL).\"}]",
+        "vgi.title": "Open Interest"
+      },
+      null,
+      [
+        "exchange",
+        "symbol"
+      ],
+      [
+        "ANY",
+        "VARCHAR"
+      ],
+      null,
+      null,
+      null,
+      true,
+      null,
+      22604,
+      [
+        "SELECT exchange, open_interest_value FROM ccxt.main.open_interest(['binance', 'okx'], 'BTC/USDT:USDT') WHERE error IS NULL ORDER BY open_interest_value DESC",
+        "SELECT open_interest_amount FROM ccxt.main.open_interest('okx', 'ETH/USDT:USDT')"
+      ],
+      null,
+      []
+    ],
+    [
+      "ccxt",
+      "22595",
+      "main",
+      "ohlcv",
+      null,
+      "table",
+      "OHLCV candles for one market on one exchange, backfilled over a time window",
+      null,
+      {
+        "vgi.category": "history",
+        "vgi.doc_llm": "Open/high/low/close/volume candles for one market. Positional arguments: exchange id (e.g. 'coinbase'), unified symbol (e.g. 'BTC/USD') and timeframe (e.g. '1h', '1d'). Named arguments: `since := TIMESTAMP '2025-01-01'` (inclusive start, UTC), `until := TIMESTAMP '2025-02-01'` (exclusive end, default now) and `max_rows` (default 100,000). With `since` the worker pages forward through the window with a cursor until it reaches `until`; without `since` it returns only the latest page of candles (the exchange's default count). `ts` is the candle's open time in UTC; prices are in the quote currency and volume in the base currency. Some exchanges keep only recent history (Kraken serves the latest 720 candles), so an old `since` can return fewer rows than the window implies; the worker then logs a warning naming the first candle the exchange returned. An unsupported timeframe is rejected at bind with the list the exchange offers.",
+        "vgi.doc_md": "## ohlcv(exchange, symbol, timeframe, since := \u2026, until := \u2026, max_rows := 100000)\n\nCandles over `[since, until)`, paged with a since-cursor; one batch per exchange page.\n\nEvery call is a live request from your machine to the exchange's public API. Nothing is cached or redistributed by this worker; you are the API caller, and each exchange's terms of use and geographic restrictions apply to you (for example, Binance.com refuses US IP addresses).",
+        "vgi.example_queries": "[{\"description\": \"Daily BTC/USD candles on Coinbase for January 2025\", \"sql\": \"SELECT ts, close, volume FROM ccxt.main.ohlcv('coinbase', 'BTC/USD', '1d', since := TIMESTAMP '2025-01-01', until := TIMESTAMP '2025-02-01') ORDER BY ts\"}, {\"description\": \"Daily high-low range of ETH/USDT on OKX in the first week of 2025, from hourly candles\", \"sql\": \"SELECT date_trunc('day', ts) AS day, max(high) - min(low) AS range_usdt FROM ccxt.main.ohlcv('okx', 'ETH/USDT', '1h', since := TIMESTAMP '2025-01-01', until := TIMESTAMP '2025-01-08') GROUP BY day ORDER BY day\"}]",
+        "vgi.keywords": "[\"ohlcv\", \"candles\", \"candlesticks\", \"klines\", \"bars\", \"price history\", \"backfill\", \"open high low close\"]",
+        "vgi.result_columns_schema": "[{\"name\": \"exchange\", \"type\": \"VARCHAR\", \"description\": \"CCXT exchange id the candle came from.\"}, {\"name\": \"symbol\", \"type\": \"VARCHAR\", \"description\": \"CCXT unified market symbol, e.g. 'BTC/USD'.\"}, {\"name\": \"timeframe\", \"type\": \"VARCHAR\", \"description\": \"Candle length, e.g. '1h' or '1d'.\"}, {\"name\": \"ts\", \"type\": \"TIMESTAMP\", \"description\": \"Candle open time, UTC.\"}, {\"name\": \"open\", \"type\": \"DOUBLE\", \"description\": \"First trade price in the candle, in the quote currency.\"}, {\"name\": \"high\", \"type\": \"DOUBLE\", \"description\": \"Highest trade price in the candle, in the quote currency.\"}, {\"name\": \"low\", \"type\": \"DOUBLE\", \"description\": \"Lowest trade price in the candle, in the quote currency.\"}, {\"name\": \"close\", \"type\": \"DOUBLE\", \"description\": \"Last trade price in the candle, in the quote currency.\"}, {\"name\": \"volume\", \"type\": \"DOUBLE\", \"description\": \"Traded volume in the candle, in the base currency.\"}]",
+        "vgi.title": "OHLCV Candles"
+      },
+      null,
+      [
+        "exchange",
+        "symbol",
+        "timeframe",
+        "until",
+        "since",
+        "max_rows"
+      ],
+      [
+        "VARCHAR",
+        "VARCHAR",
+        "VARCHAR",
+        "ANY",
+        "ANY",
+        "BIGINT"
+      ],
+      null,
+      null,
+      null,
+      true,
+      null,
+      22603,
+      [
+        "SELECT ts, close, volume FROM ccxt.main.ohlcv('coinbase', 'BTC/USD', '1d', since := TIMESTAMP '2025-01-01', until := TIMESTAMP '2025-02-01') ORDER BY ts",
+        "SELECT date_trunc('day', ts) AS day, max(high) - min(low) AS range_usdt FROM ccxt.main.ohlcv('okx', 'ETH/USDT', '1h', since := TIMESTAMP '2025-01-01', until := TIMESTAMP '2025-01-08') GROUP BY day ORDER BY day"
+      ],
+      null,
+      []
+    ],
+    [
+      "ccxt",
+      "22595",
+      "main",
+      "ticker",
+      null,
+      "table",
+      "Current price, best bid/ask and 24-hour stats for a market, across one or more exchanges",
+      null,
+      {
+        "vgi.category": "snapshots",
+        "vgi.doc_llm": "The current quote for one market: last price, best bid and ask, rolling 24-hour high, low, open, volumes and percent change. The first argument is one exchange id ('kraken') or a list (['kraken', 'coinbase', 'okx']) for a side-by-side comparison, one row per exchange; the second is the unified symbol ('BTC/USD'). Symbols differ by venue: many exchanges quote in USDT ('BTC/USDT') rather than USD. If one exchange fails (symbol not listed, geo-blocked, down) its row carries the reason in `error` and NULL prices, and the other rows are unaffected; filter `WHERE error IS NULL`.",
+        "vgi.doc_md": "## ticker(exchange | [exchange, ...], symbol)\n\nOne row per exchange with the current quote; failures appear in `error`.\n\nEvery call is a live request from your machine to the exchange's public API. Nothing is cached or redistributed by this worker; you are the API caller, and each exchange's terms of use and geographic restrictions apply to you (for example, Binance.com refuses US IP addresses).",
+        "vgi.example_queries": "[{\"description\": \"Compare BTC/USD on two US exchanges\", \"sql\": \"SELECT exchange, last, ask - bid AS spread, quote_volume FROM ccxt.main.ticker(['kraken', 'coinbase'], 'BTC/USD') WHERE error IS NULL ORDER BY last\"}, {\"description\": \"The current ETH/USDT price and 24-hour change on OKX\", \"sql\": \"SELECT last, change_pct FROM ccxt.main.ticker('okx', 'ETH/USDT')\"}]",
+        "vgi.keywords": "[\"ticker\", \"quote\", \"price\", \"last price\", \"bid ask\", \"spread\", \"24h volume\", \"cross exchange\", \"arbitrage\"]",
+        "vgi.result_columns_schema": "[{\"name\": \"exchange\", \"type\": \"VARCHAR\", \"description\": \"CCXT exchange id.\"}, {\"name\": \"symbol\", \"type\": \"VARCHAR\", \"description\": \"CCXT unified market symbol.\"}, {\"name\": \"ts\", \"type\": \"TIMESTAMP\", \"description\": \"When the exchange computed the quote, UTC (NULL if it does not say).\"}, {\"name\": \"last\", \"type\": \"DOUBLE\", \"description\": \"Last traded price, in the quote currency.\"}, {\"name\": \"bid\", \"type\": \"DOUBLE\", \"description\": \"Best bid price.\"}, {\"name\": \"ask\", \"type\": \"DOUBLE\", \"description\": \"Best ask price.\"}, {\"name\": \"high\", \"type\": \"DOUBLE\", \"description\": \"Highest price over the exchange's rolling 24-hour window.\"}, {\"name\": \"low\", \"type\": \"DOUBLE\", \"description\": \"Lowest price over the exchange's rolling 24-hour window.\"}, {\"name\": \"open\", \"type\": \"DOUBLE\", \"description\": \"Price at the start of the rolling 24-hour window.\"}, {\"name\": \"base_volume\", \"type\": \"DOUBLE\", \"description\": \"24-hour volume in the base currency.\"}, {\"name\": \"quote_volume\", \"type\": \"DOUBLE\", \"description\": \"24-hour volume in the quote currency.\"}, {\"name\": \"change_pct\", \"type\": \"DOUBLE\", \"description\": \"24-hour price change, in percent.\"}, {\"name\": \"vwap\", \"type\": \"DOUBLE\", \"description\": \"24-hour volume-weighted average price, when published.\"}, {\"name\": \"error\", \"type\": \"VARCHAR\", \"description\": \"NULL on success; otherwise why this exchange returned no data (the other columns are then NULL).\"}]",
+        "vgi.title": "Ticker Quotes"
+      },
+      null,
+      [
+        "exchange",
+        "symbol"
+      ],
+      [
+        "ANY",
+        "VARCHAR"
+      ],
+      null,
+      null,
+      null,
+      true,
+      null,
+      22606,
+      [
+        "SELECT exchange, last, ask - bid AS spread, quote_volume FROM ccxt.main.ticker(['kraken', 'coinbase'], 'BTC/USD') WHERE error IS NULL ORDER BY last",
+        "SELECT last, change_pct FROM ccxt.main.ticker('okx', 'ETH/USDT')"
+      ],
+      null,
+      []
+    ],
+    [
+      "ccxt",
+      "22595",
+      "main",
+      "order_book",
+      null,
+      "table",
+      "Order-book depth snapshot for one market: bids and asks by level",
+      null,
+      {
+        "vgi.category": "snapshots",
+        "vgi.doc_llm": "A snapshot of one market's level-2 order book: one row per price level and side. Positional: exchange id and unified symbol; named `depth` (levels per side, default 20, up to 1000; exchanges may return fewer). `side` is 'bid' or 'ask', `level` 1 is the best price, `amount` is base currency. Use it for spread, mid price and liquidity within a price band.",
+        "vgi.doc_md": "## order_book(exchange, symbol, depth := 20)\n\nBids and asks by level, best first.\n\nEvery call is a live request from your machine to the exchange's public API. Nothing is cached or redistributed by this worker; you are the API caller, and each exchange's terms of use and geographic restrictions apply to you (for example, Binance.com refuses US IP addresses).",
+        "vgi.example_queries": "[{\"description\": \"Liquidity in the top 50 levels on each side of Kraken's BTC/USD book\", \"sql\": \"SELECT side, sum(amount) AS btc, sum(price * amount) AS usd FROM ccxt.main.order_book('kraken', 'BTC/USD', depth := 50) GROUP BY side ORDER BY side\"}, {\"description\": \"Best bid and ask for ETH/USD on Coinbase\", \"sql\": \"SELECT max(price) FILTER (side = 'bid') AS best_bid, min(price) FILTER (side = 'ask') AS best_ask FROM ccxt.main.order_book('coinbase', 'ETH/USD', depth := 1)\"}]",
+        "vgi.keywords": "[\"order book\", \"depth\", \"level 2\", \"l2\", \"bids\", \"asks\", \"liquidity\", \"spread\", \"market depth\"]",
+        "vgi.result_columns_schema": "[{\"name\": \"exchange\", \"type\": \"VARCHAR\", \"description\": \"CCXT exchange id.\"}, {\"name\": \"symbol\", \"type\": \"VARCHAR\", \"description\": \"CCXT unified market symbol.\"}, {\"name\": \"ts\", \"type\": \"TIMESTAMP\", \"description\": \"Snapshot time reported by the exchange, UTC (NULL if it does not say).\"}, {\"name\": \"side\", \"type\": \"VARCHAR\", \"description\": \"'bid' (buy orders) or 'ask' (sell orders).\"}, {\"name\": \"level\", \"type\": \"BIGINT\", \"description\": \"Depth level, 1 = best price on that side.\"}, {\"name\": \"price\", \"type\": \"DOUBLE\", \"description\": \"Price level, in the quote currency.\"}, {\"name\": \"amount\", \"type\": \"DOUBLE\", \"description\": \"Quantity resting at this price, in the base currency.\"}]",
+        "vgi.title": "Order Book Depth"
+      },
+      null,
+      [
+        "exchange",
+        "symbol",
+        "depth"
+      ],
+      [
+        "VARCHAR",
+        "VARCHAR",
+        "BIGINT"
+      ],
+      null,
+      null,
+      null,
+      true,
+      null,
+      22605,
+      [
+        "SELECT side, sum(amount) AS btc, sum(price * amount) AS usd FROM ccxt.main.order_book('kraken', 'BTC/USD', depth := 50) GROUP BY side ORDER BY side",
+        "SELECT max(price) FILTER (side = 'bid') AS best_bid, min(price) FILTER (side = 'ask') AS best_ask FROM ccxt.main.order_book('coinbase', 'ETH/USD', depth := 1)"
+      ],
+      null,
+      []
+    ],
+    [
+      "ccxt",
+      "22595",
+      "main",
+      "markets",
+      null,
+      "table",
+      "Every market an exchange lists: symbols, currencies, contract terms, fees and limits",
+      null,
+      {
+        "vgi.category": "reference",
+        "vgi.doc_llm": "Every market one exchange lists: the unified `symbol` to pass to the other functions, the exchange's own `market_id`, base/quote/settle currencies, `type` ('spot', 'swap' for perpetuals, 'future', 'option'), linear or inverse, contract size, expiry, active flag, default maker/taker fees, precision and minimum order size. One request to the exchange. Use it to find the right symbol before calling ohlcv, ticker or funding_rates, for example `WHERE type = 'swap' AND base = 'BTC'`.",
+        "vgi.doc_md": "## markets(exchange)\n\nThe exchange's market list with contract terms and fees.\n\nEvery call is a live request from your machine to the exchange's public API. Nothing is cached or redistributed by this worker; you are the API caller, and each exchange's terms of use and geographic restrictions apply to you (for example, Binance.com refuses US IP addresses).",
+        "vgi.example_queries": "[{\"description\": \"BTC perpetual swaps listed on OKX\", \"sql\": \"SELECT symbol, settle, contract_size FROM ccxt.main.markets('okx') WHERE type = 'swap' AND base = 'BTC' ORDER BY symbol\"}, {\"description\": \"Kraken's five most common quote currencies\", \"sql\": \"SELECT quote, count(*) AS pairs FROM ccxt.main.markets('kraken') WHERE type = 'spot' AND active GROUP BY quote ORDER BY pairs DESC LIMIT 5\"}]",
+        "vgi.keywords": "[\"markets\", \"symbols\", \"trading pairs\", \"instruments\", \"listings\", \"perpetuals\", \"contract specs\", \"fees\"]",
+        "vgi.result_columns_schema": "[{\"name\": \"exchange\", \"type\": \"VARCHAR\", \"description\": \"CCXT exchange id.\"}, {\"name\": \"symbol\", \"type\": \"VARCHAR\", \"description\": \"CCXT unified symbol: pass this to the other functions.\"}, {\"name\": \"market_id\", \"type\": \"VARCHAR\", \"description\": \"The exchange's own market identifier.\"}, {\"name\": \"base\", \"type\": \"VARCHAR\", \"description\": \"Base currency, e.g. 'BTC'.\"}, {\"name\": \"quote\", \"type\": \"VARCHAR\", \"description\": \"Quote currency, e.g. 'USD'.\"}, {\"name\": \"settle\", \"type\": \"VARCHAR\", \"description\": \"Settlement currency for derivatives (NULL for spot).\"}, {\"name\": \"type\", \"type\": \"VARCHAR\", \"description\": \"'spot', 'swap' (perpetual), 'future' or 'option'.\"}, {\"name\": \"contract\", \"type\": \"BOOLEAN\", \"description\": \"True for derivatives.\"}, {\"name\": \"linear\", \"type\": \"BOOLEAN\", \"description\": \"For derivatives: settled in the quote currency (USDT-margined).\"}, {\"name\": \"inverse\", \"type\": \"BOOLEAN\", \"description\": \"For derivatives: settled in the base currency (coin-margined).\"}, {\"name\": \"contract_size\", \"type\": \"DOUBLE\", \"description\": \"Base-currency amount per contract, for derivatives.\"}, {\"name\": \"expiry\", \"type\": \"TIMESTAMP\", \"description\": \"Expiry time for futures and options, UTC.\"}, {\"name\": \"active\", \"type\": \"BOOLEAN\", \"description\": \"Whether the exchange currently lists the market as tradable.\"}, {\"name\": \"maker\", \"type\": \"DOUBLE\", \"description\": \"Default maker fee as a decimal (0.001 = 0.1%).\"}, {\"name\": \"taker\", \"type\": \"DOUBLE\", \"description\": \"Default taker fee as a decimal.\"}, {\"name\": \"price_precision\", \"type\": \"DOUBLE\", \"description\": \"CCXT price precision: the tick size on most exchanges, decimal places on a few.\"}, {\"name\": \"amount_precision\", \"type\": \"DOUBLE\", \"description\": \"CCXT amount precision: the lot step on most exchanges.\"}, {\"name\": \"min_amount\", \"type\": \"DOUBLE\", \"description\": \"Smallest order amount, in the base currency.\"}, {\"name\": \"min_cost\", \"type\": \"DOUBLE\", \"description\": \"Smallest order value, in the quote currency.\"}]",
+        "vgi.title": "Exchange Markets"
+      },
+      null,
+      [
+        "exchange"
+      ],
+      [
+        "VARCHAR"
+      ],
+      null,
+      null,
+      null,
+      true,
+      null,
+      22602,
+      [
+        "SELECT symbol, settle, contract_size FROM ccxt.main.markets('okx') WHERE type = 'swap' AND base = 'BTC' ORDER BY symbol",
+        "SELECT quote, count(*) AS pairs FROM ccxt.main.markets('kraken') WHERE type = 'spot' AND active GROUP BY quote ORDER BY pairs DESC LIMIT 5"
+      ],
+      null,
+      []
+    ],
+    [
+      "ccxt",
+      "22595",
+      "main",
+      "has",
+      null,
+      "table",
+      "Which CCXT methods an exchange supports: native, emulated or not at all",
+      null,
+      {
+        "vgi.category": "reference",
+        "vgi.doc_llm": "CCXT's capability map: one row per (exchange, method), for example method 'fetchOHLCV' or 'fetchFundingRateHistory', with `supported` (native or emulated), the raw `status` and `exposed_by_worker`, which marks the public market-data methods this worker can call (fetchOHLCV, fetchTicker, fetchOrderBook, fetchTrades, fetchMarkets, fetchFundingRate, fetchFundingRateHistory, fetchOpenInterest). Pass one exchange id or a list. No network request. Check it before calling a function on an unfamiliar venue: the other functions fail with a clear error when a capability is missing.",
+        "vgi.doc_md": "## has(exchange | [exchange, ...])\n\nOne row per CCXT method with its support status. Offline.\n\nEvery call is a live request from your machine to the exchange's public API. Nothing is cached or redistributed by this worker; you are the API caller, and each exchange's terms of use and geographic restrictions apply to you (for example, Binance.com refuses US IP addresses).",
+        "vgi.example_queries": "[{\"description\": \"Which of three exchanges publish funding-rate history\", \"sql\": \"SELECT exchange, supported FROM ccxt.main.has(['kraken', 'okx', 'binance']) WHERE method = 'fetchFundingRateHistory' ORDER BY exchange\"}, {\"description\": \"Kraken's support for every method this worker uses\", \"sql\": \"SELECT method, status FROM ccxt.main.has('kraken') WHERE exposed_by_worker ORDER BY method\"}]",
+        "vgi.executable_examples": "[{\"description\": \"Kraken supports candles but not funding history\", \"sql\": \"SELECT method, supported FROM ccxt.main.has('kraken') WHERE method IN ('fetchOHLCV', 'fetchFundingRateHistory') ORDER BY method\", \"expected_result\": [[\"fetchFundingRateHistory\", false], [\"fetchOHLCV\", true]]}]",
+        "vgi.keywords": "[\"capabilities\", \"has\", \"supported methods\", \"feature matrix\", \"ccxt has\", \"fetchOHLCV\", \"support\"]",
+        "vgi.result_columns_schema": "[{\"name\": \"exchange\", \"type\": \"VARCHAR\", \"description\": \"CCXT exchange id.\"}, {\"name\": \"method\", \"type\": \"VARCHAR\", \"description\": \"CCXT unified method or feature name, e.g. 'fetchOHLCV' or 'fetchFundingRateHistory'.\"}, {\"name\": \"supported\", \"type\": \"BOOLEAN\", \"description\": \"True when the method is native or emulated.\"}, {\"name\": \"status\", \"type\": \"VARCHAR\", \"description\": \"'native', 'emulated' (CCXT builds it from other calls), 'unsupported' or 'unknown'.\"}, {\"name\": \"exposed_by_worker\", \"type\": \"BOOLEAN\", \"description\": \"True for the public market-data methods this worker calls; private and trading methods are never exposed.\"}]",
+        "vgi.title": "Exchange Capabilities"
+      },
+      null,
+      [
+        "exchange"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      null,
+      true,
+      null,
+      22601,
+      [
+        "SELECT exchange, supported FROM ccxt.main.has(['kraken', 'okx', 'binance']) WHERE method = 'fetchFundingRateHistory' ORDER BY exchange",
+        "SELECT method, status FROM ccxt.main.has('kraken') WHERE exposed_by_worker ORDER BY method"
+      ],
+      null,
+      []
+    ],
+    [
+      "ccxt",
+      "22595",
+      "main",
+      "funding_rates",
+      null,
+      "table",
+      "Historical funding rates of a perpetual swap, per interval and annualized",
+      null,
+      {
+        "vgi.category": "derivatives",
+        "vgi.doc_llm": "Settled funding rates of one perpetual swap over a window. Positional: exchange id (e.g. 'binance', 'okx', 'bybit') and the unified perpetual symbol ('BTC/USDT:USDT'). Named: `start_date` (inclusive, UTC), `end_date` (exclusive, default now), `max_rows`. `funding_rate` is a decimal per funding interval with the convention positive = longs pay shorts; `interval_hours` is inferred from the spacing of settlements (exchanges use 1, 4 or 8 hours and some switch); `funding_rate_annualized` multiplies by intervals per 365-day year. Without `start_date` only the latest page is returned. Retention differs by venue: Hyperliquid serves long history, OKX about three months, KuCoin about one, Gate 180 days, and Bitget only its latest page; when an exchange starts later than `start_date` the worker logs a warning and returns what the exchange has. Fails with a clear error on exchanges without fetchFundingRateHistory (spot-only venues such as Kraken or Coinbase).",
+        "vgi.doc_md": "## funding_rates(exchange, symbol, start_date := \u2026, end_date := \u2026, max_rows := 100000)\n\nSettled funding of a perpetual, decimal per interval (positive = longs pay shorts) plus a simple annualized rate.\n\nEvery call is a live request from your machine to the exchange's public API. Nothing is cached or redistributed by this worker; you are the API caller, and each exchange's terms of use and geographic restrictions apply to you (for example, Binance.com refuses US IP addresses).",
+        "vgi.example_queries": "[{\"description\": \"Average annualized BTC perpetual funding on OKX over the last 30 days\", \"sql\": \"SELECT avg(funding_rate_annualized) AS avg_apr FROM ccxt.main.funding_rates('okx', 'BTC/USDT:USDT', start_date := current_date - INTERVAL 30 DAY)\"}, {\"description\": \"Daily total ETH perpetual funding on Binance over the first two weeks of 2025\", \"sql\": \"SELECT date_trunc('day', ts) AS day, sum(funding_rate) AS daily_funding FROM ccxt.main.funding_rates('binance', 'ETH/USDT:USDT', start_date := DATE '2025-01-01', end_date := DATE '2025-01-15') GROUP BY day ORDER BY day\"}]",
+        "vgi.keywords": "[\"funding rate\", \"funding history\", \"perpetual swap\", \"perps\", \"basis\", \"carry\", \"derivatives\"]",
+        "vgi.result_columns_schema": "[{\"name\": \"exchange\", \"type\": \"VARCHAR\", \"description\": \"CCXT exchange id.\"}, {\"name\": \"symbol\", \"type\": \"VARCHAR\", \"description\": \"CCXT unified perpetual symbol, e.g. 'BTC/USDT:USDT'.\"}, {\"name\": \"ts\", \"type\": \"TIMESTAMP\", \"description\": \"Funding settlement time, UTC.\"}, {\"name\": \"funding_rate\", \"type\": \"DOUBLE\", \"description\": \"Rate charged for the interval ending at ts, as a decimal (0.0001 = 0.01%). Positive means longs pay shorts; negative means shorts pay longs.\"}, {\"name\": \"interval_hours\", \"type\": \"DOUBLE\", \"description\": \"Length of the funding interval in hours (1, 4, 8, ...), inferred from the spacing of settlements.\"}, {\"name\": \"funding_rate_annualized\", \"type\": \"DOUBLE\", \"description\": \"funding_rate times the intervals in a 365-day year (simple, not compounded).\"}]",
+        "vgi.title": "Funding Rate History"
+      },
+      null,
+      [
+        "exchange",
+        "symbol",
+        "start_date",
+        "max_rows",
+        "end_date"
+      ],
+      [
+        "VARCHAR",
+        "VARCHAR",
+        "ANY",
+        "BIGINT",
+        "ANY"
+      ],
+      null,
+      null,
+      null,
+      true,
+      null,
+      22600,
+      [
+        "SELECT avg(funding_rate_annualized) AS avg_apr FROM ccxt.main.funding_rates('okx', 'BTC/USDT:USDT', start_date := current_date - INTERVAL 30 DAY)",
+        "SELECT date_trunc('day', ts) AS day, sum(funding_rate) AS daily_funding FROM ccxt.main.funding_rates('binance', 'ETH/USDT:USDT', start_date := DATE '2025-01-01', end_date := DATE '2025-01-15') GROUP BY day ORDER BY day"
+      ],
+      null,
+      []
+    ],
+    [
+      "ccxt",
+      "22595",
+      "main",
+      "funding_rate",
+      null,
+      "table",
+      "Current funding rate of a perpetual swap, per interval and annualized, across exchanges",
+      null,
+      {
+        "vgi.category": "derivatives",
+        "vgi.doc_llm": "The funding rate that applies at the next settlement of a perpetual swap, with its interval, an annualized rate, the settlement time, mark and index price. First argument: one exchange id or a list for comparison; second: the unified perpetual symbol ('BTC/USDT:USDT' on Binance, Bybit and OKX). `funding_rate` is a decimal per interval with positive = longs pay shorts. Exchanges without fetchFundingRate, or that do not list the symbol, return a row with `error` set. For settled history use `funding_rates`.",
+        "vgi.doc_md": "## funding_rate(exchange | [exchange, ...], symbol)\n\nNext-settlement funding per exchange, decimal per interval (positive = longs pay) and annualized.\n\nEvery call is a live request from your machine to the exchange's public API. Nothing is cached or redistributed by this worker; you are the API caller, and each exchange's terms of use and geographic restrictions apply to you (for example, Binance.com refuses US IP addresses).",
+        "vgi.example_queries": "[{\"description\": \"Rank venues by annualized BTC perpetual funding\", \"sql\": \"SELECT exchange, funding_rate, interval_hours, funding_rate_annualized FROM ccxt.main.funding_rate(['binance', 'okx'], 'BTC/USDT:USDT') WHERE error IS NULL ORDER BY funding_rate_annualized DESC\"}, {\"description\": \"The next ETH perpetual funding settlement on OKX\", \"sql\": \"SELECT funding_rate, next_funding_ts FROM ccxt.main.funding_rate('okx', 'ETH/USDT:USDT') WHERE error IS NULL\"}]",
+        "vgi.keywords": "[\"funding rate\", \"current funding\", \"predicted funding\", \"perpetual swap\", \"perps\", \"mark price\"]",
+        "vgi.result_columns_schema": "[{\"name\": \"exchange\", \"type\": \"VARCHAR\", \"description\": \"CCXT exchange id.\"}, {\"name\": \"symbol\", \"type\": \"VARCHAR\", \"description\": \"CCXT unified perpetual symbol.\"}, {\"name\": \"ts\", \"type\": \"TIMESTAMP\", \"description\": \"When the exchange published the rate, UTC.\"}, {\"name\": \"funding_rate\", \"type\": \"DOUBLE\", \"description\": \"Rate for the upcoming settlement as a decimal per interval; positive means longs pay shorts.\"}, {\"name\": \"interval_hours\", \"type\": \"DOUBLE\", \"description\": \"Funding interval in hours, as the exchange declares it.\"}, {\"name\": \"funding_rate_annualized\", \"type\": \"DOUBLE\", \"description\": \"funding_rate times intervals per 365-day year (simple).\"}, {\"name\": \"next_funding_ts\", \"type\": \"TIMESTAMP\", \"description\": \"When the rate settles, UTC.\"}, {\"name\": \"mark_price\", \"type\": \"DOUBLE\", \"description\": \"Mark price used for margining.\"}, {\"name\": \"index_price\", \"type\": \"DOUBLE\", \"description\": \"Spot index price the perpetual tracks.\"}, {\"name\": \"error\", \"type\": \"VARCHAR\", \"description\": \"NULL on success; otherwise why this exchange returned no data (the other columns are then NULL).\"}]",
+        "vgi.title": "Current Funding Rate"
+      },
+      null,
+      [
+        "exchange",
+        "symbol"
+      ],
+      [
+        "ANY",
+        "VARCHAR"
+      ],
+      null,
+      null,
+      null,
+      true,
+      null,
+      22599,
+      [
+        "SELECT exchange, funding_rate, interval_hours, funding_rate_annualized FROM ccxt.main.funding_rate(['binance', 'okx'], 'BTC/USDT:USDT') WHERE error IS NULL ORDER BY funding_rate_annualized DESC",
+        "SELECT funding_rate, next_funding_ts FROM ccxt.main.funding_rate('okx', 'ETH/USDT:USDT') WHERE error IS NULL"
+      ],
+      null,
+      []
+    ],
+    [
+      "ccxt",
+      "22595",
+      "main",
+      "trades",
+      null,
+      "table",
+      "Public trades (time and sales) for one market on one exchange over a time window",
+      null,
+      {
+        "vgi.category": "history",
+        "vgi.doc_llm": "Public executed trades for one market. Positional: exchange id and unified symbol. Named: `since` (inclusive start, UTC), `until` (exclusive end, default now) and `max_rows` (default 100,000). With `since` the worker pages forward with a cursor that keeps fills sharing a millisecond intact across page boundaries (exchanges that need an explicit window end, such as Coinbase, are walked in self-sizing time windows); without `since` it returns the exchange's most recent page. Many exchanges only serve recent trades publicly (hours to days), so a deep `since` may start later than requested. `side` is the taker side; `amount` is base currency; `cost` is price times amount.",
+        "vgi.doc_md": "## trades(exchange, symbol, since := \u2026, until := \u2026, max_rows := 100000)\n\nExecuted trades over `[since, until)`, paged with a since-cursor that de-duplicates fills at page edges.\n\nEvery call is a live request from your machine to the exchange's public API. Nothing is cached or redistributed by this worker; you are the API caller, and each exchange's terms of use and geographic restrictions apply to you (for example, Binance.com refuses US IP addresses).",
+        "vgi.example_queries": "[{\"description\": \"Buy versus sell volume in Kraken's most recent BTC/USD trades\", \"sql\": \"SELECT side, count(*) AS trades, sum(amount) AS btc FROM ccxt.main.trades('kraken', 'BTC/USD') GROUP BY side ORDER BY side\"}, {\"description\": \"Volume-weighted average price over Coinbase's most recent ETH/USD trades\", \"sql\": \"SELECT sum(price * amount) / sum(amount) AS vwap, min(ts) AS first_trade FROM ccxt.main.trades('coinbase', 'ETH/USD')\"}]",
+        "vgi.keywords": "[\"trades\", \"fills\", \"time and sales\", \"tape\", \"executions\", \"tick data\", \"prints\"]",
+        "vgi.result_columns_schema": "[{\"name\": \"exchange\", \"type\": \"VARCHAR\", \"description\": \"CCXT exchange id the trade came from.\"}, {\"name\": \"symbol\", \"type\": \"VARCHAR\", \"description\": \"CCXT unified market symbol, e.g. 'BTC/USD'.\"}, {\"name\": \"trade_id\", \"type\": \"VARCHAR\", \"description\": \"The exchange's identifier for the trade, when it publishes one.\"}, {\"name\": \"ts\", \"type\": \"TIMESTAMP\", \"description\": \"Execution time, UTC.\"}, {\"name\": \"side\", \"type\": \"VARCHAR\", \"description\": \"Taker side: 'buy' or 'sell'.\"}, {\"name\": \"price\", \"type\": \"DOUBLE\", \"description\": \"Execution price, in the quote currency.\"}, {\"name\": \"amount\", \"type\": \"DOUBLE\", \"description\": \"Executed quantity, in the base currency (contracts for some derivatives).\"}, {\"name\": \"cost\", \"type\": \"DOUBLE\", \"description\": \"price times amount, in the quote currency.\"}, {\"name\": \"taker_or_maker\", \"type\": \"VARCHAR\", \"description\": \"'taker' or 'maker' when the exchange reports it.\"}]",
+        "vgi.title": "Public Trades"
+      },
+      null,
+      [
+        "exchange",
+        "symbol",
+        "until",
+        "since",
+        "max_rows"
+      ],
+      [
+        "VARCHAR",
+        "VARCHAR",
+        "ANY",
+        "ANY",
+        "BIGINT"
+      ],
+      null,
+      null,
+      null,
+      true,
+      null,
+      22607,
+      [
+        "SELECT side, count(*) AS trades, sum(amount) AS btc FROM ccxt.main.trades('kraken', 'BTC/USD') GROUP BY side ORDER BY side",
+        "SELECT sum(price * amount) / sum(amount) AS vwap, min(ts) AS first_trade FROM ccxt.main.trades('coinbase', 'ETH/USD')"
+      ],
+      null,
+      []
+    ]
+  ]
+}

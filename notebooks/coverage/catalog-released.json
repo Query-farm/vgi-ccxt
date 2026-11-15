@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "repository": "Query-farm/vgi-ccxt",
+  "revision": "v0.1.0",
+  "captured_at": "2026-11-15T01:34:43.053959+00:00",
+  "default_schema": "main",
+  "scope": "all_public_functions_and_tables",
+  "complete": true,
+  "evidence": [
+    {
+      "path": "coverage/provenance.json",
+      "sha256": "01741b744d64a953abc3ed8165d7968107936ff17ba593038e9daf98862478b2",
+      "description": "Actual collection and explicit synthetic fixture provenance."
+    },
+    {
+      "path": "coverage/source-comparison.json",
+      "sha256": "e4aa62df1a3460e93c18a53a5c0c66a60e07d8152ef2503d0aae0473955a28bf",
+      "description": "Full release/current source/dependency comparison."
+    },
+    {
+      "path": "coverage/analysis-preservation.json",
+      "sha256": "27fa7f12534eca74875114973829040f19388478f0f44e8af0484116a35fa646",
+      "description": "Original eight SQL cells, seven displayed tables and fixture preservation audit."
+    },
+    {
+      "path": "coverage/released-functions.json",
+      "sha256": "29596a27622904d520946ca420660c7a0e65f3a174538afb5a3d8d499ab30be2",
+      "description": "Complete native duckdb_functions() export filtered by ccxt; no names omitted."
+    },
+    {
+      "path": "coverage/released-tables.json",
+      "sha256": "ce9c6b6a42217ba3d7604e2910dcdbbe77fbf504ecbff8bb9b50e30821ea3358",
+      "description": "Complete native duckdb_tables() export filtered by ccxt; no names omitted."
+    },
+    {
+      "path": "coverage/released-views.json",
+      "sha256": "8c87dbc8c6bb757c2c5404fa4c563fbc23e1e83736de79a6e2d8229827f403a8",
+      "description": "Complete native duckdb_views() export filtered by ccxt; no names omitted."
+    },
+    {
+      "path": "coverage/released-databases.json",
+      "sha256": "d68735806702b6099277321fac7adf276483e61ab2e83f45a64d4421acde4185",
+      "description": "Actual catalog title/subtitle and metadata."
+    }
+  ],
+  "objects": [
+    {
+      "schema": "main",
+      "name": "exchanges",
+      "kind": "table",
+      "signatures": [
+        "TABLES"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "funding_rate",
+      "kind": "function",
+      "signatures": [
+        "funding_rate(ANY, VARCHAR) -> TABLE"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "funding_rates",
+      "kind": "function",
+      "signatures": [
+        "funding_rates(VARCHAR, VARCHAR, ANY, BIGINT, ANY) -> TABLE"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "has",
+      "kind": "function",
+      "signatures": [
+        "has(ANY) -> TABLE"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "markets",
+      "kind": "function",
+      "signatures": [
+        "markets(VARCHAR) -> TABLE"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "ohlcv",
+      "kind": "function",
+      "signatures": [
+        "ohlcv(VARCHAR, VARCHAR, VARCHAR, ANY, ANY, BIGINT) -> TABLE"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "open_interest",
+      "kind": "function",
+      "signatures": [
+        "open_interest(ANY, VARCHAR) -> TABLE"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "order_book",
+      "kind": "function",
+      "signatures": [
+        "order_book(VARCHAR, VARCHAR, BIGINT) -> TABLE"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "ticker",
+      "kind": "function",
+      "signatures": [
+        "ticker(ANY, VARCHAR) -> TABLE"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "trades",
+      "kind": "function",
+      "signatures": [
+        "trades(VARCHAR, VARCHAR, ANY, ANY, BIGINT) -> TABLE"
+      ],
+      "authentication": "none",
+      "access": "read"
+    }
+  ]
+}

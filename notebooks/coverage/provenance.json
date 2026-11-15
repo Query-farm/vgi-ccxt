@@ -1,0 +1,13 @@
+{
+  "repository": "Query-farm/vgi-ccxt",
+  "release_tag": "v0.1.0",
+  "release_revision": "93346f19673b037758a1ebb2afe88cac3f9b16ef",
+  "current_public_revision": "7d120d7ab850cdc60cdf28df8ae9e6b8a03f568a",
+  "engine": "Haybarn 2.0.0rc11 / VGI e75482339d",
+  "captured_at": "2026-11-15T01:34:43.053959+00:00",
+  "released_launch": "uvx --from git+https://github.com/Query-farm/vgi-ccxt@v0.1.0 vgi-ccxt-worker",
+  "current_catalog_probe": "Same clean uvx Git launcher with exact public-main SHA; both actual native catalogs collected through real Haybarn with empty temporary SQL-secret storage and UTC. No worker build/source changes.",
+  "data_boundary": "Explicit VGI_CCXT_FIXTURES selects the released worker built-in FakeExchange. One unchanged test fixture companion; all values synthetic, never fallback. Original funding story preserved. Separate bounded live OKX ticker read passed with fixture mode removed; no live rows enter these books.",
+  "counting": "All ten logical (schema,name) surfaces: nine functions plus exchanges table; zero views. Every public surface retained. Client allowlist exposes only public read methods; no credentials or write APIs. A fixture may advertise private capabilities, but the worker filters these rather than exposing them.",
+  "comparison": "Released v0.1.0 and captured public main expose the same ten logical names and input signatures. Full source/dependency diff adds only composed metadata/examples and agent tasks; runtime transformations, fixture generator and dependency files are unchanged. All analytical receipts use the released worker; current-interface credit is reviewed against this evidence, not mislabeled as execution of the current SHA."
+}

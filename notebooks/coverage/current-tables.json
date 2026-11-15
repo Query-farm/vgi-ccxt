@@ -1,0 +1,50 @@
+{
+  "query": "SELECT * FROM duckdb_tables() WHERE database_name='ccxt'",
+  "columns": [
+    "database_name",
+    "database_oid",
+    "schema_name",
+    "schema_oid",
+    "table_name",
+    "table_oid",
+    "comment",
+    "tags",
+    "internal",
+    "temporary",
+    "has_primary_key",
+    "estimated_size",
+    "column_count",
+    "index_count",
+    "check_constraint_count",
+    "sql"
+  ],
+  "rows": [
+    [
+      "ccxt",
+      22595,
+      "main",
+      22596,
+      "exchanges",
+      22739,
+      "Every crypto exchange CCXT supports, with name, countries and key capabilities",
+      {
+        "domain": "finance",
+        "vgi.category": "reference",
+        "vgi.doc_llm": "One row per exchange CCXT supports: the `id` every other function takes, display name, countries, CCXT certification, rate limit, website and whether it supports candles, trades, funding-rate history and open interest. No network request. Use it to find exchange ids and to choose venues for derivatives queries, for example `WHERE has_funding_rate_history`. Country and capability data are CCXT's; an exchange may still refuse requests from your region.",
+        "vgi.doc_md": "## exchanges\n\nA table: every CCXT exchange id with its name, countries and capabilities. Offline.\n\nEvery call is a live request from your machine to the exchange's public API. Nothing is cached or redistributed by this worker; you are the API caller, and each exchange's terms of use and geographic restrictions apply to you (for example, Binance.com refuses US IP addresses).",
+        "vgi.example_queries": "[{\"description\": \"Exchanges that publish both funding history and open interest\", \"sql\": \"SELECT id, name FROM ccxt.main.exchanges WHERE has_funding_rate_history AND has_open_interest ORDER BY id\"}, {\"description\": \"The ten countries listed for the most exchanges\", \"sql\": \"SELECT unnest(countries) AS country, count(*) AS exchanges FROM ccxt.main.exchanges GROUP BY country ORDER BY exchanges DESC LIMIT 10\"}]",
+        "vgi.keywords": "[\"exchanges\", \"venues\", \"list exchanges\", \"exchange ids\", \"ccxt exchanges\", \"capabilities\"]",
+        "vgi.result_columns_schema": "[{\"name\": \"id\", \"type\": \"VARCHAR\", \"description\": \"CCXT exchange id: the value every other function takes.\"}, {\"name\": \"name\", \"type\": \"VARCHAR\", \"description\": \"Display name, e.g. 'Kraken'.\"}, {\"name\": \"countries\", \"type\": \"VARCHAR[]\", \"description\": \"ISO country codes CCXT lists for the exchange.\"}, {\"name\": \"certified\", \"type\": \"BOOLEAN\", \"description\": \"Whether CCXT marks the integration as certified.\"}, {\"name\": \"pro\", \"type\": \"BOOLEAN\", \"description\": \"Whether CCXT Pro supports the exchange over WebSockets.\"}, {\"name\": \"rate_limit_ms\", \"type\": \"DOUBLE\", \"description\": \"Minimum spacing CCXT keeps between requests, in milliseconds.\"}, {\"name\": \"website\", \"type\": \"VARCHAR\", \"description\": \"The exchange's home page.\"}, {\"name\": \"has_ohlcv\", \"type\": \"BOOLEAN\", \"description\": \"Whether ohlcv works on this exchange.\"}, {\"name\": \"has_trades\", \"type\": \"BOOLEAN\", \"description\": \"Whether trades works on this exchange.\"}, {\"name\": \"has_funding_rate_history\", \"type\": \"BOOLEAN\", \"description\": \"Whether funding_rates works on this exchange.\"}, {\"name\": \"has_open_interest\", \"type\": \"BOOLEAN\", \"description\": \"Whether open_interest works on this exchange.\"}]",
+        "vgi.title": "Supported Exchanges"
+      },
+      false,
+      false,
+      true,
+      0,
+      11,
+      1,
+      0,
+      "CREATE TABLE exchanges(id VARCHAR, \"name\" VARCHAR, countries VARCHAR[], certified BOOLEAN, pro BOOLEAN, rate_limit_ms DOUBLE, website VARCHAR, has_ohlcv BOOLEAN, has_trades BOOLEAN, has_funding_rate_history BOOLEAN, has_open_interest BOOLEAN, PRIMARY KEY(id));"
+    ]
+  ]
+}

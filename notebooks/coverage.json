@@ -1,0 +1,402 @@
+{
+  "schema_version": 1,
+  "catalogs": {
+    "released": {
+      "path": "coverage/catalog-released.json",
+      "sha256": "377455a8fa764ed6725ca6f60bbe6e9c7a466b6b4b5820aeda77de0401ce538e",
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_ortools",
+        "reviewed_at": "2026-11-15T01:34:43.053959+00:00",
+        "catalog_sha256": "377455a8fa764ed6725ca6f60bbe6e9c7a466b6b4b5820aeda77de0401ce538e",
+        "notes": "All ten public logical surfaces retained. Released v0.1.0 and captured public main expose the same ten logical names and input signatures. Full source/dependency diff adds only composed metadata/examples and agent tasks; runtime transformations, fixture generator and dependency files are unchanged. All analytical receipts use the released worker; current-interface credit is reviewed against this evidence, not mislabeled as execution of the current SHA."
+      }
+    },
+    "current": {
+      "path": "coverage/catalog-current.json",
+      "sha256": "7d0f1ffb89e5c614912411947ebe30e5760dc0815b1d81263067be4f5bbed32f",
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_ortools",
+        "reviewed_at": "2026-11-15T01:34:43.053959+00:00",
+        "catalog_sha256": "7d0f1ffb89e5c614912411947ebe30e5760dc0815b1d81263067be4f5bbed32f",
+        "notes": "All ten public logical surfaces retained. Released v0.1.0 and captured public main expose the same ten logical names and input signatures. Full source/dependency diff adds only composed metadata/examples and agent tasks; runtime transformations, fixture generator and dependency files are unchanged. All analytical receipts use the released worker; current-interface credit is reviewed against this evidence, not mislabeled as execution of the current SHA."
+      }
+    }
+  },
+  "notebooks": [
+    {
+      "path": "01_funding_rates_need_intervals.ipynb",
+      "sha256": "9da68e1a02f4f4a637cdcc9fa6901197e192becd59f4dff334e3cea3775eb628",
+      "execution": {
+        "path": "coverage/run-01.json",
+        "sha256": "c907b2b526b9bf036e0b8d2bf2510d45878d5bb8ac34dca7c38d68dfc6c1fee8"
+      }
+    },
+    {
+      "path": "02_snapshot_values_need_their_units.ipynb",
+      "sha256": "644d76f542f1e3058cff57932fa7692a1c81a1de30d24db0d5828f014382c565",
+      "execution": {
+        "path": "coverage/run-02.json",
+        "sha256": "b1ee9d03c8c0e5b04c5a3f628e595f536a391ae65d30bd6714a9dc284324f3b5"
+      }
+    },
+    {
+      "path": "03_a_row_cap_is_not_a_time_window.ipynb",
+      "sha256": "fe91e76a87da3fff5c257c17b0c089a47ef4d68e2e88b8a336d93b5d815d30bd",
+      "execution": {
+        "path": "coverage/run-03.json",
+        "sha256": "1d23dbdd1c3cb4d49e8c6e13cd5ad25005614e9f9dffc6b9e8374397b339b6d3"
+      }
+    }
+  ],
+  "examples": [
+    {
+      "object": {
+        "schema": "main",
+        "name": "has"
+      },
+      "notebook": "01_funding_rates_need_intervals.ipynb",
+      "sql": [
+        {
+          "cell": "5b2d5665",
+          "reference": "ccxt.main.has"
+        }
+      ],
+      "narrative_cells": [
+        "e6bc802c"
+      ],
+      "result_cells": [
+        "21e9aa4f"
+      ],
+      "interpretation_cells": [
+        "21e9aa4f"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_ortools",
+        "reviewed_at": "2026-11-15T01:34:43.053959+00:00",
+        "notebook_sha256": "9da68e1a02f4f4a637cdcc9fa6901197e192becd59f4dff334e3cea3775eb628",
+        "catalog_sha256": [
+          "377455a8fa764ed6725ca6f60bbe6e9c7a466b6b4b5820aeda77de0401ce538e",
+          "7d0f1ffb89e5c614912411947ebe30e5760dc0815b1d81263067be4f5bbed32f"
+        ],
+        "purpose": "Check funding-history capability before interpreting availability.",
+        "finding": "Two of three selected fixture venues support funding history, one contributes rows in the window. Unsupported Kraken is not called; supported-empty OKX is distinct from a measured zero funding rate."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "funding_rates"
+      },
+      "notebook": "01_funding_rates_need_intervals.ipynb",
+      "sql": [
+        {
+          "cell": "a96f1e9b",
+          "reference": "ccxt.main.funding_rates"
+        }
+      ],
+      "narrative_cells": [
+        "518d6b2c"
+      ],
+      "result_cells": [
+        "ade678ee",
+        "ce098d30"
+      ],
+      "interpretation_cells": [
+        "ce098d30"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_ortools",
+        "reviewed_at": "2026-11-15T01:34:43.053959+00:00",
+        "notebook_sha256": "9da68e1a02f4f4a637cdcc9fa6901197e192becd59f4dff334e3cea3775eb628",
+        "catalog_sha256": [
+          "377455a8fa764ed6725ca6f60bbe6e9c7a466b6b4b5820aeda77de0401ce538e",
+          "7d0f1ffb89e5c614912411947ebe30e5760dc0815b1d81263067be4f5bbed32f"
+        ],
+        "purpose": "Retain the original multi-page settlement history, infer intervals and compare fixed-denominator simple annualization.",
+        "finding": "42 settlements span an 8→4-hour interval transition. All 41 preceding gaps agree with inferred intervals. Fixed 8h changes 20 conversions by up to 43.8 percentage points/year; 4h moves error to the 17 nonzero 8h settlements with unchanged source fingerprint."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "exchanges"
+      },
+      "notebook": "02_snapshot_values_need_their_units.ipynb",
+      "sql": [
+        {
+          "cell": "reference-fetch",
+          "reference": "ccxt.main.exchanges"
+        }
+      ],
+      "narrative_cells": [
+        "reference-story"
+      ],
+      "result_cells": [
+        "reference-results"
+      ],
+      "interpretation_cells": [
+        "reference-results"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_ortools",
+        "reviewed_at": "2026-11-15T01:34:43.053959+00:00",
+        "notebook_sha256": "644d76f542f1e3058cff57932fa7692a1c81a1de30d24db0d5828f014382c565",
+        "catalog_sha256": [
+          "377455a8fa764ed6725ca6f60bbe6e9c7a466b6b4b5820aeda77de0401ce538e",
+          "7d0f1ffb89e5c614912411947ebe30e5760dc0815b1d81263067be4f5bbed32f"
+        ],
+        "purpose": "Establish the fixture exchange roster and capability population before selecting contracts and fan-outs.",
+        "finding": "Four explicit stand-in identities are shown; only two support funding history and open interest. Capability support, selected contract existence and successful snapshot returns are separate populations, not an implied list of live exchanges."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "markets"
+      },
+      "notebook": "02_snapshot_values_need_their_units.ipynb",
+      "sql": [
+        {
+          "cell": "reference-fetch",
+          "reference": "ccxt.main.markets"
+        }
+      ],
+      "narrative_cells": [
+        "reference-story"
+      ],
+      "result_cells": [
+        "reference-fetch",
+        "units-chart"
+      ],
+      "interpretation_cells": [
+        "units-chart"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_ortools",
+        "reviewed_at": "2026-11-15T01:34:43.053959+00:00",
+        "notebook_sha256": "644d76f542f1e3058cff57932fa7692a1c81a1de30d24db0d5828f014382c565",
+        "catalog_sha256": [
+          "377455a8fa764ed6725ca6f60bbe6e9c7a466b6b4b5820aeda77de0401ce538e",
+          "7d0f1ffb89e5c614912411947ebe30e5760dc0815b1d81263067be4f5bbed32f"
+        ],
+        "purpose": "Read contract size, base/quote/settle and linear/inverse fields before making a quantity conversion.",
+        "finding": "The selected BTC perpetual definitions share the symbol but differ in contract size (1 versus 0.01). Explicitly assuming the open-interest amount is contracts gives a 100× mismatch for the OKX stand-in against its reported value; the synthetic generator explains this, not a proven live conversion."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "ticker"
+      },
+      "notebook": "02_snapshot_values_need_their_units.ipynb",
+      "sql": [
+        {
+          "cell": "snapshots-fetch",
+          "reference": "ccxt.main.ticker"
+        }
+      ],
+      "narrative_cells": [
+        "snapshot-story"
+      ],
+      "result_cells": [
+        "units-chart"
+      ],
+      "interpretation_cells": [
+        "units-chart"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_ortools",
+        "reviewed_at": "2026-11-15T01:34:43.053959+00:00",
+        "notebook_sha256": "644d76f542f1e3058cff57932fa7692a1c81a1de30d24db0d5828f014382c565",
+        "catalog_sha256": [
+          "377455a8fa764ed6725ca6f60bbe6e9c7a466b6b4b5820aeda77de0401ce538e",
+          "7d0f1ffb89e5c614912411947ebe30e5760dc0815b1d81263067be4f5bbed32f"
+        ],
+        "purpose": "Use the reported last quote as a clearly identified reference price, retaining unavailable fan-out rows.",
+        "finding": "Two perpetual tickers supply reference prices for an explicit unit test; Kraken retains an error and NULL measurements. The separately retrieved Binance spot ticker agrees with book level 1. Shared fixture timestamps do not establish atomic real snapshots."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "funding_rate"
+      },
+      "notebook": "02_snapshot_values_need_their_units.ipynb",
+      "sql": [
+        {
+          "cell": "snapshots-fetch",
+          "reference": "ccxt.main.funding_rate"
+        }
+      ],
+      "narrative_cells": [
+        "snapshot-story"
+      ],
+      "result_cells": [
+        "snapshots-fetch",
+        "units-chart"
+      ],
+      "interpretation_cells": [
+        "units-chart"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_ortools",
+        "reviewed_at": "2026-11-15T01:34:43.053959+00:00",
+        "notebook_sha256": "644d76f542f1e3058cff57932fa7692a1c81a1de30d24db0d5828f014382c565",
+        "catalog_sha256": [
+          "377455a8fa764ed6725ca6f60bbe6e9c7a466b6b4b5820aeda77de0401ce538e",
+          "7d0f1ffb89e5c614912411947ebe30e5760dc0815b1d81263067be4f5bbed32f"
+        ],
+        "purpose": "Distinguish upcoming synthetic settlement funding and its own interval from the historical settlement schedule.",
+        "finding": "Both successful rows report 1 bp per eight-hour interval and 10.95% simple annualization; Kraken is unavailable. The fixture current generator retains eight hours independently of the history generator transition, so current interval is not substituted for historical intervals."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "open_interest"
+      },
+      "notebook": "02_snapshot_values_need_their_units.ipynb",
+      "sql": [
+        {
+          "cell": "snapshots-fetch",
+          "reference": "ccxt.main.open_interest"
+        }
+      ],
+      "narrative_cells": [
+        "snapshot-story"
+      ],
+      "result_cells": [
+        "units-chart"
+      ],
+      "interpretation_cells": [
+        "units-chart"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_ortools",
+        "reviewed_at": "2026-11-15T01:34:43.053959+00:00",
+        "notebook_sha256": "644d76f542f1e3058cff57932fa7692a1c81a1de30d24db0d5828f014382c565",
+        "catalog_sha256": [
+          "377455a8fa764ed6725ca6f60bbe6e9c7a466b6b4b5820aeda77de0401ce538e",
+          "7d0f1ffb89e5c614912411947ebe30e5760dc0815b1d81263067be4f5bbed32f"
+        ],
+        "purpose": "Compare reported open-interest value against an explicit, testable contracts-unit assumption.",
+        "finding": "Raw amount is 12,345 on both stand-ins; reported values near 494 million USDT do not automatically imply matching contract counts. The 0.01 contract-size assumption yields 4.94 million for OKX versus 494.05 million reported. The mismatch remains visible and prevents unsupported aggregation."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "order_book"
+      },
+      "notebook": "02_snapshot_values_need_their_units.ipynb",
+      "sql": [
+        {
+          "cell": "book-fetch",
+          "reference": "ccxt.main.order_book"
+        }
+      ],
+      "narrative_cells": [
+        "book-story"
+      ],
+      "result_cells": [
+        "book-fetch",
+        "book-chart"
+      ],
+      "interpretation_cells": [
+        "book-chart"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_ortools",
+        "reviewed_at": "2026-11-15T01:34:43.053959+00:00",
+        "notebook_sha256": "644d76f542f1e3058cff57932fa7692a1c81a1de30d24db0d5828f014382c565",
+        "catalog_sha256": [
+          "377455a8fa764ed6725ca6f60bbe6e9c7a466b6b4b5820aeda77de0401ce538e",
+          "7d0f1ffb89e5c614912411947ebe30e5760dc0815b1d81263067be4f5bbed32f"
+        ],
+        "purpose": "Cumulatively aggregate explicitly spot BTC quantities and compare level-one prices with a separate ticker.",
+        "finding": "Five levels per side return 15 BTC each; ten levels return 55 BTC with original rows retained and other measurements identical. Price distance is measured in basis points from the spot midpoint; no execution or liquidity guarantee is inferred."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "ohlcv"
+      },
+      "notebook": "03_a_row_cap_is_not_a_time_window.ipynb",
+      "sql": [
+        {
+          "cell": "history-fetch",
+          "reference": "ccxt.main.ohlcv"
+        }
+      ],
+      "narrative_cells": [
+        "counts-story"
+      ],
+      "result_cells": [
+        "history-fetch",
+        "population-chart"
+      ],
+      "interpretation_cells": [
+        "population-chart"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_ortools",
+        "reviewed_at": "2026-11-15T01:34:43.053959+00:00",
+        "notebook_sha256": "fe91e76a87da3fff5c257c17b0c089a47ef4d68e2e88b8a336d93b5d815d30bd",
+        "catalog_sha256": [
+          "377455a8fa764ed6725ca6f60bbe6e9c7a466b6b4b5820aeda77de0401ce538e",
+          "7d0f1ffb89e5c614912411947ebe30e5760dc0815b1d81263067be4f5bbed32f"
+        ],
+        "purpose": "Measure a cap-limited candle prefix against a known fixed-hour fixture population.",
+        "finding": "A 40-row budget returns 40 of 60 minute candles through timestamp 00:39. At 80, all 60 candle labels through 00:59 are returned; earlier rows remain identical. Labels and continuous interval coverage are explicitly distinguished."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "trades"
+      },
+      "notebook": "03_a_row_cap_is_not_a_time_window.ipynb",
+      "sql": [
+        {
+          "cell": "history-fetch",
+          "reference": "ccxt.main.trades"
+        }
+      ],
+      "narrative_cells": [
+        "ties-story"
+      ],
+      "result_cells": [
+        "population-chart",
+        "ties-fetch",
+        "ties-chart"
+      ],
+      "interpretation_cells": [
+        "ties-chart"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_ortools",
+        "reviewed_at": "2026-11-15T01:34:43.053959+00:00",
+        "notebook_sha256": "fe91e76a87da3fff5c257c17b0c089a47ef4d68e2e88b8a336d93b5d815d30bd",
+        "catalog_sha256": [
+          "377455a8fa764ed6725ca6f60bbe6e9c7a466b6b4b5820aeda77de0401ce538e",
+          "7d0f1ffb89e5c614912411947ebe30e5760dc0815b1d81263067be4f5bbed32f"
+        ],
+        "purpose": "Keep unique event IDs across timestamp ties and page boundaries while measuring the temporal effect of an output cap.",
+        "finding": "40 trades occupy 21 timestamps through 00:20, ending with one of three expected events at that minute. At 80, more than one 40-trade page is needed; the prior event IDs remain identical and the final timestamp still has a partial group. Timestamp-only deduplication would discard valid synthetic events."
+      }
+    }
+  ]
+}

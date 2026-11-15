@@ -1,0 +1,72 @@
+{
+  "baseline": "7d120d7ab850cdc60cdf28df8ae9e6b8a03f568a",
+  "meaning": "Original analytical SQL statements unchanged after whitespace normalization; ATTACH alone migrated to clean released launch. Original displayed tables and original fixture bytes are identical. Heading levels, setup explanation and explicitly disclosed independent visual scales updated; changed narrative recorded below. One frozen companion match published manifest.",
+  "original_sql_cells_preserved": [
+    "5a67277f",
+    "5b2d5665",
+    "a96f1e9b",
+    "1aee958f",
+    "af9bf4f9",
+    "b4c76259",
+    "4fc677ab",
+    "266c74a5"
+  ],
+  "markdown_narrative_cells_preserved": [
+    "9b5e4bc4",
+    "493779e8",
+    "518d6b2c",
+    "46a71ee6",
+    "1f107289"
+  ],
+  "markdown_cells_updated": [
+    {
+      "cell": "e6bc802c",
+      "before": "Attach the pinned worker, then check capability The literal uvx command downloads the Git-tagged worker into uv's cache. Its CCXT, SDK and RPC versions match the tested release environment; the surrounding worker checkout is unnecessary. `fixtures.json` is an unchanged copy of the repository's shipped test fixture. Capability is a prerequisite, not a promise of data in our window. Here we check both before treating an empty result as a measured zero.",
+      "after": "Attach the pinned worker, then check capability The literal uvx command downloads the Git-tagged worker into uv's cache. The release owns its dependencies; no transitive overrides or surrounding worker checkout are needed. `fixtures.json` is an unchanged copy of the repository's shipped test fixture. Capability is a prerequisite, not a promise of data in our window. Here we check both before treating an empty result as a measured zero."
+    }
+  ],
+  "saved_html_tables": [
+    {
+      "cell": "5a67277f",
+      "tables": 1,
+      "identical": true
+    },
+    {
+      "cell": "5b2d5665",
+      "tables": 1,
+      "identical": true
+    },
+    {
+      "cell": "a96f1e9b",
+      "tables": 1,
+      "identical": true
+    },
+    {
+      "cell": "21e9aa4f",
+      "tables": 1,
+      "identical": true
+    },
+    {
+      "cell": "ade678ee",
+      "tables": 1,
+      "identical": true
+    },
+    {
+      "cell": "b4c76259",
+      "tables": 1,
+      "identical": true
+    },
+    {
+      "cell": "ce098d30",
+      "tables": 1,
+      "identical": true
+    }
+  ],
+  "fixtures": [
+    {
+      "path": "notebooks/fixtures.json",
+      "sha256": "6d4af927d0c7c98dcc51943d0ee54890e64269b2f5c5161e942911fdb387f4ed"
+    }
+  ],
+  "frozen_companions_verified": 1
+}

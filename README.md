@@ -218,6 +218,6 @@ The market data this worker returns belongs to the exchanges, is not covered by 
 license, and is subject to each exchange's terms. This project is not affiliated with or
 endorsed by CCXT or any exchange. See [NOTICE](NOTICE).
 
-## Executed notebook
+## Executed notebooks
 
-[Funding rates need settlement intervals](notebooks/README.md) uses explicit synthetic fixtures to compare inferred intervals with a fixed annualization assumption.
+[Three executed SQL stories](notebooks/README.md) cover funding intervals, snapshot units and bounded candle/trade history with explicit synthetic fixtures, meaningful experiments, GitHub charts and Colab setup.
