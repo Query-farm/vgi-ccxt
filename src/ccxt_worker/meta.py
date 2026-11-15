@@ -95,6 +95,13 @@ def result_columns(schema: pa.Schema) -> str:
     )
 
 
+#: The catalog COMMENT: one plain-text sentence directories show as the one-line description.
+CATALOG_COMMENT = (
+    "Public cryptocurrency market data from more than one hundred centralized exchanges "
+    "through the CCXT library: candles, trades, quotes, order books, and perpetual funding "
+    "and open interest. Every query is a live request to the exchange. No API key needed."
+)
+
 CATALOG_DOC_LLM = (
     "Public cryptocurrency market data from more than one hundred centralized exchanges, through "
     "the CCXT library's unified API. Exchanges are named by their CCXT id (for example 'kraken', "

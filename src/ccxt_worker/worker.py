@@ -27,7 +27,7 @@ from vgi.catalog.constraints import constraint_record
 from .composed import COMPOSED_EXAMPLES
 from .history import FundingRates, Ohlcv, Trades
 from .meta import (
-    CATALOG_DOC_MD,
+    CATALOG_COMMENT,
     CATALOG_NAME,
     CATALOG_TAGS,
     SCHEMA_CATEGORIES,
@@ -92,7 +92,7 @@ class CcxtWorker(Worker):
 
     catalog = Catalog(
         name=CATALOG_NAME,
-        comment=CATALOG_DOC_MD,
+        comment=CATALOG_COMMENT,
         source_url=SOURCE_URL,
         tags=CATALOG_TAGS,
         schemas=[
