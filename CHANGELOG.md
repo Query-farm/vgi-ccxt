@@ -7,6 +7,9 @@
   documentation and its PyPI package (VGI183).
 - The `main` schema comment is now a short one-line summary, so the schema's
   `vgi.doc_md` adds detail instead of repeating it (VGI102).
+- The first `funding_rates` example reads a fixed window (Binance BTC perpetual,
+  June 2025) instead of OKX's last 30 days, so it returns real numbers against
+  the offline fixtures too (VGI913); its description shows the rolling-window form.
 
 ## 0.1.1 (2026-11-14)
 

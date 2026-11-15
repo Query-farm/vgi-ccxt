@@ -696,11 +696,14 @@ class FundingRates(TableFunctionGenerator[FundingRatesArgs, FundingCursor]):
         examples = [
             FunctionExample(
                 sql=(
-                    "SELECT avg(funding_rate_annualized) AS avg_apr "
-                    "FROM ccxt.main.funding_rates('okx', 'BTC/USDT:USDT', "
-                    "start_date := current_date - INTERVAL 30 DAY)"
+                    "SELECT count(*) AS settlements, avg(funding_rate_annualized) AS avg_apr "
+                    "FROM ccxt.main.funding_rates('binance', 'BTC/USDT:USDT', "
+                    "start_date := DATE '2025-06-01', end_date := DATE '2025-07-01')"
                 ),
-                description="Average annualized BTC perpetual funding on OKX over the last 30 days",
+                description=(
+                    "Number of settlements and average annualized BTC perpetual funding on Binance "
+                    "over June 2025 (for a rolling window, pass start_date := current_date - INTERVAL 30 DAY)"
+                ),
             ),
             FunctionExample(
                 sql=(
