@@ -43,10 +43,10 @@ INSTALL vgi FROM query_farm;
 LOAD vgi FROM query_farm;
 
 ATTACH 'ccxt' AS ccxt (TYPE vgi,
-  LOCATION 'uvx --from git+https://github.com/Query-farm/vgi-ccxt@v0.1.3 vgi-ccxt-worker');
+  LOCATION 'uvx --from git+https://github.com/Query-farm/vgi-ccxt@v0.1.4 vgi-ccxt-worker');
 ```
 
-`uvx` fetches and caches the worker on first use; change `@v0.1.3` to move to a newer release.
+`uvx` fetches and caches the worker on first use; change `@v0.1.4` to move to a newer release.
 
 In [Haybarn](https://query.farm/products/haybarn) use `INSTALL vgi FROM community; LOAD vgi;`
 and the same `ATTACH`.
