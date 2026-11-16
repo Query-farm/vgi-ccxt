@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3 (2026-11-16)
+
+- Bump vgi-python to 0.52.2.
+
 ## 0.1.2 (unreleased)
 
 - Docs link to the CCXT library: the catalog documentation now ends with a

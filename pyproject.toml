@@ -1,6 +1,6 @@
 [project]
 name = "vgi-ccxt-worker"
-version = "0.1.2"
+version = "0.1.3"
 description = "Crypto exchange market data (candles, quotes, order books, trades, perpetual funding) for DuckDB via CCXT"
 readme = "README.md"
 license = "MIT"
@@ -12,7 +12,7 @@ dependencies = [
     "ccxt>=4.5.92,<5",
     # [http] adds the HTTP transport (`--http`) used by Docker deploys.
     # SDK bumps go through the template (minor bumps can raise the protocol).
-    "vgi-python[http]>=0.52.0,<0.53",
+    "vgi-python[http]>=0.52.2,<0.53",
 ]
 
 [project.scripts]
@@ -22,7 +22,7 @@ vgi-ccxt-worker = "ccxt_worker.worker:main"
 dev = [
     # The pushdown recipe evaluates predicates locally; a worker that uses filter
     # pushdown must add the `haybarn` extra to its own dependencies.
-    "vgi-python[haybarn]>=0.52.0,<0.53",
+    "vgi-python[haybarn]>=0.52.2,<0.53",
     "pytest>=8.4",
     "mypy>=1.18",
     "ruff>=0.14",
