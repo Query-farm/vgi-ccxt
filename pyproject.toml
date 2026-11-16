@@ -7,7 +7,7 @@ license = "MIT"
 license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Query Farm LLC", email = "hello@query.farm" }]
 keywords = ["duckdb", "vgi", "query-farm", "ccxt", "crypto", "market-data", "ohlcv", "funding-rate"]
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "ccxt>=4.5.92,<5",
     # [http] adds the HTTP transport (`--http`) used by Docker deploys.
@@ -38,7 +38,7 @@ packages = ["src/ccxt_worker"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "D"]
@@ -51,7 +51,7 @@ ignore = ["D203", "D213", "RUF012"]
 
 [tool.mypy]
 strict = true
-python_version = "3.13"
+python_version = "3.14"
 files = ["src", "tests"]
 
 [[tool.mypy.overrides]]

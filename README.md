@@ -34,7 +34,7 @@ one `symbol` / `timeframe` / `since` shape; this worker puts that shape behind S
 
 ## Quick start
 
-Requires Python 3.13+ and [uv](https://docs.astral.sh/uv/). In DuckDB 2.0:
+Requires Python 3.14+ and [uv](https://docs.astral.sh/uv/). In DuckDB 2.0:
 
 ```sql
 SET allow_extension_repositories = 'allowed';
