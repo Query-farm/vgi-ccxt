@@ -43,10 +43,10 @@ INSTALL vgi FROM query_farm;
 LOAD vgi FROM query_farm;
 
 ATTACH 'ccxt' AS ccxt (TYPE vgi,
-  LOCATION 'uvx --from git+https://github.com/Query-farm/vgi-ccxt@v0.1.4 vgi-ccxt-worker');
+  LOCATION 'uvx --from git+https://github.com/Query-farm/vgi-ccxt@v0.2.0 vgi-ccxt-worker');
 ```
 
-`uvx` fetches and caches the worker on first use; change `@v0.1.4` to move to a newer release.
+`uvx` fetches and caches the worker on first use; change `@v0.2.0` to move to a newer release.
 
 In [Haybarn](https://query.farm/products/haybarn) use `INSTALL vgi FROM community; LOAD vgi;`
 and the same `ATTACH`.
@@ -60,6 +60,8 @@ ATTACH 'ccxt' (TYPE vgi, LOCATION '/abs/path/to/vgi-ccxt/.venv/bin/vgi-ccxt-work
 -- A worker served over HTTP (make run-http, or the Docker image); also LOAD httpfs.
 ATTACH 'ccxt' (TYPE vgi, LOCATION 'http://127.0.0.1:8000');
 ```
+
+vgi-ccxt 0.2.0 speaks VGI protocol 3.4, so it needs Haybarn 2.0.1 or newer (Haybarn 2.0.0 loads a 3.3 `vgi` extension that cannot attach it).
 
 ## Examples
 
